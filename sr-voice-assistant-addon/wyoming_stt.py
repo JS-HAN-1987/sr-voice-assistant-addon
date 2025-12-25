@@ -9,6 +9,7 @@ from wyoming.event import Event
 from wyoming.info import Describe, Info, Attribution, AsrProgram, AsrModel
 from wyoming.server import AsyncEventHandler, AsyncServer
 from wyoming.asr import Transcribe, Transcript
+from utils import fire_ha_event, load_options # 추가
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -78,7 +79,12 @@ class GoogleSttEventHandler(AsyncEventHandler):
             
             # 비동기로 음성 인식 실행
             text = await self._recognize_speech()
-            
+            if text:
+                fire_ha_event("voice_stt", {
+                    "text": text,
+                    "language": self.language
+                })
+
             # 결과 전송
             await self.write_event(
                 Transcript(text=text).event()
@@ -108,6 +114,7 @@ class GoogleSttEventHandler(AsyncEventHandler):
                     language=self.language
                 )
             )
+
             return text
         except sr.UnknownValueError:
             _LOGGER.warning("음성을 인식할 수 없습니다")
@@ -118,6 +125,7 @@ class GoogleSttEventHandler(AsyncEventHandler):
         except Exception as e:
             _LOGGER.error(f"인식 오류: {e}")
             return ""
+
 
 
 async def main():

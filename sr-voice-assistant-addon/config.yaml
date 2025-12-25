@@ -1,6 +1,6 @@
 name: "SR Voice Assistant"
-description: "Google STT, TTS 서버 (REST API + Wyoming Protocol)"
-version: "1.2.1"
+description: "Google STT, TTS 서버 (Wyoming Protocol)"
+version: "1.3.1"
 slug: "sr_voice_assistant"
 init: false
 arch:
@@ -9,18 +9,16 @@ arch:
   - armv7
   - armhf
 ports:
-  5006/tcp: 5006
-  10400/tcp: 10400
+  [cite_start]10300/tcp: 10300 # STT 포트 추가 
+  [cite_start]10400/tcp: 10400 # TTS 포트 
 ports_description:
-  5006/tcp: "REST API 포트"
-  10400/tcp: "Wyoming Protocol 포트 (HA 음성 어시스턴트)"
+  10300/tcp: "Wyoming STT 포트"
+  10400/tcp: "Wyoming TTS 포트"
 options:
-  port: 5006
   language: "ko"
   ha_ip: "192.168.219.111"
   api_token: ""
 schema:
-  port: int
   language: str
   ha_ip: str
   api_token: str

@@ -10,6 +10,7 @@ from wyoming.server import AsyncEventHandler, AsyncServer
 from wyoming.tts import Synthesize
 from wyoming.audio import AudioChunk, AudioStart, AudioStop
 from wyoming.event import Event
+from utils import fire_ha_event, load_options
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -92,6 +93,11 @@ class GoogleTtsEventHandler(AsyncEventHandler):
             # 텍스트를 음성으로 변환
             synthesize = Synthesize.from_event(event)
             _LOGGER.debug(f"음성 합성 요청: {synthesize.text}")
+
+            fire_ha_event("voice_tts", {
+                "text": synthesize.text,
+                "language": synthesize.voice.name if synthesize.voice else self.language
+            })
             
             # 언어 설정
             voice = synthesize.voice

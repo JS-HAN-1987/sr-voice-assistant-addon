@@ -14,7 +14,6 @@ RUN apk add --no-cache \
 
 # 파일 복사
 COPY run.sh /
-COPY app.py /
 COPY wyoming_stt.py /
 COPY wyoming_tts.py /
 COPY requirements.txt /
@@ -23,7 +22,7 @@ COPY requirements.txt /
 RUN echo "[INFO] Python 패키지 설치 중..." && \
     pip3 install --no-cache-dir --break-system-packages -r /requirements.txt && \
     echo "[INFO] 설치된 패키지:" && \
-    pip3 list | grep -E "(Flask|SpeechRecognition|gTTS|wyoming|requests|cors)"
+    pip3 list | grep -E "(SpeechRecognition|gTTS|wyoming|requests)"
 
 # 실행 권한 부여
 RUN chmod a+x /run.sh
