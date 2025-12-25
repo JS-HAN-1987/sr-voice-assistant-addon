@@ -92,19 +92,15 @@ class GoogleTtsEventHandler(AsyncEventHandler):
         if Synthesize.is_type(event.type):
             # 텍스트를 음성으로 변환
             synthesize = Synthesize.from_event(event)
-            _LOGGER.debug(f"음성 합성 요청: {synthesize.text}")
+            _LOGGER.info(f"TTS 요청 수신: {synthesize.text}")
 
-            # 언어 태그 처리 (ko-KR 이 들어와도 앞의 ko만 추출)
-            requested_lang = synthesize.voice.name if synthesize.voice else self.language
-            if requested_lang.startswith("ko"):
-                target_lang = "ko"
-            else:
-                target_lang = requested_lang
-
-            fire_ha_event("voice_tts", {
-                "text": synthesize.text,
-                "language": synthesize.voice.name if synthesize.voice else self.language
-            })
+            # 2. 이벤트 발생 (루프를 방해하지 않게 백그라운드로 뺌)
+            try:
+                loop = asyncio.get_running_loop()
+                # executor를 사용해야 requests.post가 음성 합성을 방해하지 않습니다.
+                loop.run_in_executor(None, fire_ha_event, "voice_tts", {"text": synthesize.text})
+            except Exception as e:
+                _LOGGER.error(f"이벤트 발생 코드 에러: {e}")
             
             # 언어 설정
             voice = synthesize.voice

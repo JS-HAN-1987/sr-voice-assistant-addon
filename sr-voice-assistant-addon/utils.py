@@ -28,26 +28,21 @@ def load_options():
     token = os.environ.get('SR_VOICE_TOKEN') or options.get('api_token')
     return options, token
 
-def fire_ha_event(event_type: str, event_data: dict):
-    """Home Assistant API를 통해 이벤트 발생"""
-    options, token = load_options()
-    ha_ip = options.get('ha_ip')
+def fire_ha_event(event_type, event_data):
+    # 이 로그가 찍히는지 확인하는 게 핵심입니다!
+    print(f">>> [DEBUG] fire_ha_event 호출됨: {event_type}", flush=True)
     
+    options, token = load_options()
     if not token:
-        _LOGGER.warning(f"토큰이 없어 이벤트를 건너뜁니다: {event_type}")
-        return False
+        print(">>> [DEBUG] 에러: 토큰이 없습니다!", flush=True)
+        return
 
+    # IP 주소가 제대로 오는지 확인
+    ha_ip = options.get('ha_ip', '192.168.219.111')
     url = f"http://{ha_ip}:8123/api/events/{event_type}"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-
+    
     try:
-        response = requests.post(url, json=event_data, headers=headers, timeout=5)
-        if response.status_code in [200, 201]:
-            _LOGGER.info(f"HA 이벤트 전송 성공: {event_type}")
-            return True
+        r = requests.post(url, json=event_data, headers={"Authorization": f"Bearer {token}"}, timeout=2)
+        print(f">>> [DEBUG] HA 응답 코드: {r.status_code}", flush=True)
     except Exception as e:
-        _LOGGER.error(f"HA 이벤트 전송 오류: {e}")
-    return False
+        print(f">>> [DEBUG] 전송 중 예외 발생: {e}", flush=True)
