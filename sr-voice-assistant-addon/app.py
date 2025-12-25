@@ -142,21 +142,26 @@ def register_mqtt_discovery():
     
     # STT 센서 Discovery (sensor)
     stt_config = {
-        "name": "Voice Last STT",  # 장치 이름과 결합하여 "SR Voice Assistant Voice Last STT"가 됨
+        "name": "Voice Last STT",
         "unique_id": "sr_voice_last_stt",
         "state_topic": "sr_voice/stt/state",
         "json_attributes_topic": "sr_voice/stt/attributes",
+        "value_template": "{{ value_json.text if value_json is defined else value }}",
         "availability_topic": f"{mqtt_discovery_prefix}/status",
         "payload_available": "online",
         "payload_not_available": "offline",
         "device": device,
         "icon": "mdi:microphone",
-        "has_entity_name": True,  # 장치 이름을 entity 이름 앞에 붙임
+        "has_entity_name": True,
         "origin": {
             "name": "SR Voice Assistant",
             "sw_version": "1.0.0",
             "support_url": "https://github.com/your-repo/sr-voice-assistant"
-        }
+        },
+        # 속성 표시 설정
+        "json_attributes_template": "{{ value_json | tojson }}",
+        "state_class": "measurement",
+        "suggested_display_precision": 0
     }
     
     # TTS 센서 Discovery (sensor)
@@ -165,6 +170,7 @@ def register_mqtt_discovery():
         "unique_id": "sr_voice_last_tts",
         "state_topic": "sr_voice/tts/state",
         "json_attributes_topic": "sr_voice/tts/attributes",
+        "value_template": "{{ value_json.text if value_json is defined else value }}",
         "availability_topic": f"{mqtt_discovery_prefix}/status",
         "payload_available": "online",
         "payload_not_available": "offline",
@@ -175,28 +181,38 @@ def register_mqtt_discovery():
             "name": "SR Voice Assistant",
             "sw_version": "1.0.0",
             "support_url": "https://github.com/your-repo/sr-voice-assistant"
-        }
+        },
+        # 속성 표시 설정
+        "json_attributes_template": "{{ value_json | tojson }}",
+        "state_class": "measurement",
+        "suggested_display_precision": 0
     }
     
     try:
-        # Discovery 메시지 발행 (retain=True로 설정하여 브로커에 저장)
+        # Discovery 메시지 발행
         stt_topic = f"{mqtt_discovery_prefix}/sensor/sr_voice_last_stt/config"
         tts_topic = f"{mqtt_discovery_prefix}/sensor/sr_voice_last_tts/config"
         
-        mqtt_client.publish(stt_topic, json.dumps(stt_config), retain=True)
-        mqtt_client.publish(tts_topic, json.dumps(tts_config), retain=True)
+        print(f"[MQTT] 📡 Discovery 메시지 발행 =======================", flush=True)
+        print(f"[MQTT]   STT 토픽: {stt_topic}", flush=True)
+        print(f"[MQTT]   TTS 토픽: {tts_topic}", flush=True)
         
-        print(f"[MQTT] ✓ Discovery 센서 등록 완료", flush=True)
-        print(f"[MQTT]   - STT: {stt_topic}", flush=True)
-        print(f"[MQTT]   - TTS: {tts_topic}", flush=True)
+        mqtt_client.publish(stt_topic, json.dumps(stt_config, indent=2), retain=True)
+        mqtt_client.publish(tts_topic, json.dumps(tts_config, indent=2), retain=True)
+        
+        print(f"[MQTT] ✅ Discovery 센서 등록 완료", flush=True)
         
     except Exception as e:
-        print(f"[MQTT] ✗ Discovery 등록 실패: {e}", flush=True)
+        print(f"[MQTT] ❌ Discovery 등록 실패: {e}", flush=True)
 
 # publish_mqtt_sensor 함수 시작 부분에 추가
 def publish_mqtt_sensor(entity_type: str, state: str, attributes: dict = None):
     """MQTT를 통해 센서 상태 발행"""
     global mqtt_connected
+    
+    print(f"[DEBUG] publish_mqtt_sensor 호출: {entity_type}", flush=True)
+    print(f"[DEBUG] 상태값: {state}", flush=True)
+    print(f"[DEBUG] 속성: {attributes}", flush=True)
     
     # MQTT 연결 상태 체크 및 재시도
     if not mqtt_connected:
@@ -213,11 +229,16 @@ def publish_mqtt_sensor(entity_type: str, state: str, attributes: dict = None):
     try:
         timestamp = datetime.now().isoformat()
         
-        # 기본 속성 설정
+        # 기본 속성 설정 - 더 많은 정보 추가
         base_attributes = {
             "timestamp": timestamp,
             "last_updated": timestamp,
-            "friendly_name": "마지막 음성 인식" if entity_type == "stt" else "마지막 음성 출력"
+            "friendly_name": "마지막 음성 인식" if entity_type == "stt" else "마지막 음성 출력",
+            "icon": "mdi:microphone" if entity_type == "stt" else "mdi:speaker",
+            "device_class": "text",
+            "original_text": state,  # 원본 텍스트 저장
+            "text_length": len(state),  # 텍스트 길이
+            "language": attributes.get('language', 'ko-KR') if attributes else 'ko-KR'
         }
         
         if attributes:
@@ -237,40 +258,64 @@ def publish_mqtt_sensor(entity_type: str, state: str, attributes: dict = None):
         else:
             return False
         
-        print(f"[MQTT] {entity_type.upper()} 발행 시도: {state_topic}", flush=True)
-        print(f"[MQTT] 상태: {state[:100]}...", flush=True)
+        print(f"[MQTT] 📤 {entity_type.upper()} 발행 시작 ==========================", flush=True)
+        print(f"[MQTT]   토픽: {state_topic}", flush=True)
+        print(f"[MQTT]   상태값: {state}", flush=True)
+        print(f"[MQTT]   속성 토픽: {attr_topic}", flush=True)
+        print(f"[MQTT]   속성 데이터:", flush=True)
+        for key, value in base_attributes.items():
+            print(f"[MQTT]     {key}: {value}", flush=True)
         
-        # 상태 발행
+        # 1. 상태 발행
+        print(f"[MQTT]   → 상태 발행 중...", flush=True)
         mqtt_client.publish(state_topic, state, retain=True)
+        print(f"[MQTT]   ✓ 상태 발행 완료", flush=True)
         
-        # 속성 발행
+        # 2. 속성 발행
+        print(f"[MQTT]   → 속성 발행 중...", flush=True)
+        attr_json = json.dumps(base_attributes, ensure_ascii=False, indent=2)
         mqtt_client.publish(
             attr_topic,
-            json.dumps(base_attributes, ensure_ascii=False),
+            attr_json,
             retain=True
         )
+        print(f"[MQTT]   ✓ 속성 발행 완료", flush=True)
+        print(f"[MQTT]   속성 JSON:", flush=True)
+        print(attr_json, flush=True)
         
-        # 이벤트 발행 (retain=False, 이벤트는 저장하지 않음)
+        # 3. 이벤트 발행 (retain=False, 이벤트는 저장하지 않음)
+        print(f"[MQTT]   → 이벤트 발행 중...", flush=True)
         event_data = {
             "text": state,
             "timestamp": timestamp,
             "type": entity_type,
-            **{k: v for k, v in base_attributes.items() if k not in ["timestamp", "last_updated"]}
+            "language": base_attributes.get('language', 'ko-KR'),
+            "text_length": len(state),
+            "original_text": state,
+            **{k: v for k, v in base_attributes.items() 
+               if k not in ["timestamp", "last_updated", "friendly_name", "icon"]}
         }
+        
+        event_json = json.dumps(event_data, ensure_ascii=False, indent=2)
         mqtt_client.publish(
             event_topic,
-            json.dumps(event_data, ensure_ascii=False),
+            event_json,
             retain=False
         )
+        print(f"[MQTT]   ✓ 이벤트 발행 완료", flush=True)
+        print(f"[MQTT]   이벤트 토픽: {event_topic}", flush=True)
         
-        print(f"[MQTT] ✓ {entity_type.upper()} 상태 발행 완료: {state[:50]}...", flush=True)
+        print(f"[MQTT] ✅ {entity_type.upper()} 발행 완료 =======================", flush=True)
+        print(f"[MQTT]   요약: '{state[:50]}{'...' if len(state) > 50 else ''}'", flush=True)
         return True
         
     except Exception as e:
-        print(f"[MQTT] ✗ 상태 발행 실패: {e}", flush=True)
+        print(f"[MQTT] ❌ 상태 발행 실패: {e}", flush=True)
         import traceback
         traceback.print_exc()
         return False
+
+
 
 # ==================== STT 엔드포인트 ====================
 @app.route('/stt', methods=['POST'])
@@ -290,9 +335,13 @@ def speech_to_text():
             
             timestamp = datetime.now().isoformat()
             
-            print(f"[STT] 인식 결과: {text}", flush=True)
+            print(f"[STT] 🎤 음성 인식 완료 ===========================", flush=True)
+            print(f"[STT]   인식 텍스트: {text}", flush=True)
+            print(f"[STT]   언어: {language}", flush=True)
+            print(f"[STT]   텍스트 길이: {len(text)}", flush=True)
+            print(f"[STT]   타임스탬프: {timestamp}", flush=True)
             
-            # ▼▼▼ MQTT로 상태 발행 (REST API 대신) ▼▼▼
+            # MQTT로 상태 발행
             mqtt_success = publish_mqtt_sensor(
                 "stt",
                 text,
@@ -301,15 +350,26 @@ def speech_to_text():
                     "icon": "mdi:microphone",
                     "timestamp": timestamp,
                     "language": language,
-                    "device_class": "text"
+                    "device_class": "text",
+                    "source": "google_stt",
+                    "recognition_type": "speech_to_text",
+                    "text_display": text,  # 표시용 텍스트
+                    "char_count": len(text),
+                    "word_count": len(text.split()),
+                    "processing_time": datetime.now().isoformat(),
+                    "additional_info": {
+                        "service": "Google Speech Recognition",
+                        "confidence": "high",  # Google STT는 신뢰도 정보 제공 안함
+                        "audio_format": audio_file.content_type if audio_file.content_type else "wav"
+                    }
                 }
             )
             
             if mqtt_success:
-                print(f"[MQTT] STT 상태 발행 성공: {text[:50]}...", flush=True)
+                print(f"[STT] ✅ MQTT 발행 성공", flush=True)
             else:
-                print(f"[MQTT] STT 상태 발행 실패", flush=True)
-                # MQTT 실패 시 REST API로 폴백
+                print(f"[STT] ⚠️ MQTT 발행 실패, REST API로 폴백", flush=True)
+                # REST API로 폴백
                 update_ha_sensor(
                     "sensor.voice_last_stt",
                     text,
@@ -317,31 +377,38 @@ def speech_to_text():
                         "friendly_name": "마지막 음성 인식",
                         "icon": "mdi:microphone",
                         "timestamp": timestamp,
-                        "language": language
+                        "language": language,
+                        "original_text": text,
+                        "text_length": len(text)
                     }
                 )
-            # ▲▲▲ 여기까지 ▲▲▲
             
-            # 이벤트 발생 (옵션)
-            fire_ha_event("voice_stt", {
-                "text": text,
-                "timestamp": timestamp,
-                "language": language
-            })
+            print(f"[STT] ============================================", flush=True)
             
             return json_response({
                 "result": text,
                 "timestamp": timestamp,
                 "language": language,
-                "mqtt_published": mqtt_success
+                "text_length": len(text),
+                "mqtt_published": mqtt_success,
+                "char_count": len(text),
+                "word_count": len(text.split())
             })
             
     except sr.UnknownValueError:
-        return json_response({"error": "음성을 인식할 수 없습니다"}, 422)
+        error_msg = "음성을 인식할 수 없습니다"
+        print(f"[STT] ❌ 오류: {error_msg}", flush=True)
+        return json_response({"error": error_msg}, 422)
     except sr.RequestError as e:
-        return json_response({"error": f"Google 서비스 에러: {e}"}, 500)
+        error_msg = f"Google 서비스 에러: {e}"
+        print(f"[STT] ❌ 오류: {error_msg}", flush=True)
+        return json_response({"error": error_msg}, 500)
     except Exception as e:
-        return json_response({"error": f"서버 오류: {str(e)}"}, 500)
+        error_msg = f"서버 오류: {str(e)}"
+        print(f"[STT] ❌ 오류: {error_msg}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return json_response({"error": error_msg}, 500)
 
 # ==================== TTS 엔드포인트 ====================
 @app.route('/tts', methods=['POST'])
@@ -374,10 +441,13 @@ def text_to_speech():
         
         timestamp = datetime.now().isoformat()
         
-        print(f"[TTS] 변환 텍스트: {text}", flush=True)
-        print(f"[TTS] 언어: {tts_lang}", flush=True)
+        print(f"[TTS] 🔊 텍스트 변환 시작 ===========================", flush=True)
+        print(f"[TTS]   입력 텍스트: {text}", flush=True)
+        print(f"[TTS]   언어: {tts_lang}", flush=True)
+        print(f"[TTS]   텍스트 길이: {len(text)}", flush=True)
+        print(f"[TTS]   단어 수: {len(text.split())}", flush=True)
         
-        # ▼▼▼ MQTT로 상태 발행 (REST API 대신) ▼▼▼
+        # MQTT로 상태 발행
         mqtt_success = publish_mqtt_sensor(
             "tts",
             text,
@@ -386,15 +456,28 @@ def text_to_speech():
                 "icon": "mdi:speaker",
                 "timestamp": timestamp,
                 "language": tts_lang,
-                "device_class": "text"
+                "device_class": "text",
+                "source": "google_tts",
+                "synthesis_type": "text_to_speech",
+                "text_display": text,
+                "char_count": len(text),
+                "word_count": len(text.split()),
+                "audio_language": tts_lang,
+                "tts_engine": "gTTS (Google Text-to-Speech)",
+                "additional_info": {
+                    "service": "Google TTS",
+                    "engine": "gTTS",
+                    "speed": "normal",
+                    "output_format": "mp3"
+                }
             }
         )
         
         if mqtt_success:
-            print(f"[MQTT] TTS 상태 발행 성공: {text[:50]}...", flush=True)
+            print(f"[TTS] ✅ MQTT 발행 성공", flush=True)
         else:
-            print(f"[MQTT] TTS 상태 발행 실패", flush=True)
-            # MQTT 실패 시 REST API로 폴백
+            print(f"[TTS] ⚠️ MQTT 발행 실패, REST API로 폴백", flush=True)
+            # REST API로 폴백
             update_ha_sensor(
                 "sensor.voice_last_tts",
                 text,
@@ -402,26 +485,23 @@ def text_to_speech():
                     "friendly_name": "마지막 음성 출력",
                     "icon": "mdi:speaker",
                     "timestamp": timestamp,
-                    "language": tts_lang
+                    "language": tts_lang,
+                    "original_text": text,
+                    "text_length": len(text)
                 }
             )
-        # ▲▲▲ 여기까지 ▲▲▲
-        
-        # 이벤트 발생 (옵션)
-        fire_ha_event("voice_tts", {
-            "text": text,
-            "timestamp": timestamp,
-            "language": tts_lang
-        })
         
         # gTTS로 음성 생성
+        print(f"[TTS]   → 음성 생성 중...", flush=True)
         tts = gTTS(text=text, lang=tts_lang, slow=False)
         audio_buffer = io.BytesIO()
         tts.write_to_fp(audio_buffer)
         audio_buffer.seek(0)
         
         file_size = len(audio_buffer.getvalue())
-        print(f"[TTS] 음성 파일 생성 완료: {file_size} bytes", flush=True)
+        print(f"[TTS]   ✓ 음성 파일 생성 완료: {file_size} bytes", flush=True)
+        
+        print(f"[TTS] ============================================", flush=True)
         
         return send_file(
             audio_buffer,
@@ -431,9 +511,15 @@ def text_to_speech():
         )
         
     except ValueError as e:
-        return json_response({"error": f"지원하지 않는 언어입니다: {str(e)}"}, 400)
+        error_msg = f"지원하지 않는 언어입니다: {str(e)}"
+        print(f"[TTS] ❌ 오류: {error_msg}", flush=True)
+        return json_response({"error": error_msg}, 400)
     except Exception as e:
-        return json_response({"error": f"서버 오류: {str(e)}"}, 500)
+        error_msg = f"서버 오류: {str(e)}"
+        print(f"[TTS] ❌ 오류: {error_msg}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return json_response({"error": error_msg}, 500)
 
 # ==================== 상태 확인 ====================
 @app.route('/health', methods=['GET'])
@@ -513,6 +599,52 @@ def mqtt_status():
         "discovery_prefix": mqtt_discovery_prefix,
         "timestamp": datetime.now().isoformat()
     })
+
+
+
+@app.route('/debug/mqtt-test', methods=['POST'])
+def debug_mqtt_test():
+    """MQTT 디버그 테스트"""
+    try:
+        test_data = request.get_json() or {}
+        test_text = test_data.get('text', '디버그 테스트 메시지')
+        test_type = test_data.get('type', 'stt')  # 'stt' or 'tts'
+        
+        print(f"[DEBUG] 🔧 MQTT 테스트 시작 =========================", flush=True)
+        print(f"[DEBUG]   테스트 텍스트: {test_text}", flush=True)
+        print(f"[DEBUG]   테스트 타입: {test_type}", flush=True)
+        print(f"[DEBUG]   MQTT 연결 상태: {mqtt_connected}", flush=True)
+        
+        # MQTT 연결 상태 출력
+        if mqtt_client:
+            print(f"[DEBUG]   MQTT 클라이언트 ID: {mqtt_client._client_id}", flush=True)
+        
+        # 테스트 발행
+        result = publish_mqtt_sensor(
+            test_type,
+            test_text,
+            {
+                "test": True,
+                "debug": True,
+                "timestamp": datetime.now().isoformat(),
+                "message": "디버그 테스트 메시지",
+                "language": "ko-KR"
+            }
+        )
+        
+        print(f"[DEBUG]   발행 결과: {result}", flush=True)
+        print(f"[DEBUG] ============================================", flush=True)
+        
+        return json_response({
+            "success": result,
+            "mqtt_connected": mqtt_connected,
+            "test_text": test_text,
+            "test_type": test_type,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return json_response({"error": f"디버그 테스트 실패: {str(e)}"}, 500)
 
 if __name__ == '__main__':
     options = load_options()
