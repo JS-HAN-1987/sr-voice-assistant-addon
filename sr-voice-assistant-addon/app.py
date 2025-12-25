@@ -47,111 +47,7 @@ def load_options():
         "ha_ip": "192.168.219.111"
     }
 
-def get_ha_token():
-    """Supervisor 토큰 가져오기"""
-    token = os.environ.get('SR_VOICE_TOKEN')
-    if not token:
-        print("[WARNING] SR_VOICE_TOKEN 없습니다.", flush=True)
-    else:
-        print(f"[INFO] SR_VOICE_TOKEN 확인됨 (길이: {len(token)})", flush=True)
-    return token
 
-def update_ha_sensor(entity_id: str, state: str, attributes: dict = None):
-    """Home Assistant 센서 상태 업데이트"""
-    options = load_options()
-    ha_ip = options.get('ha_ip', '192.168.219.111')
-    ha_url = f"http://{ha_ip}:8123/api"
-    
-    token = get_ha_token()
-    
-    if not token:
-        print(f"[WARNING] 토큰 없음 - 센서 업데이트 건너뜀: {entity_id}", flush=True)
-        return False
-    
-    url = f"{ha_url}/states/{entity_id}"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-    
-    # device_info 추가
-    device_info = {
-        "identifiers": ["sr_voice_assistant"],
-        "name": "SR Voice Assistant",
-        "manufacturer": "Custom",
-        "model": "Voice Assistant v1.0"
-    }
-    
-    base_attributes = {
-        "friendly_name": "마지막 음성 인식" if "stt" in entity_id else "마지막 음성 출력",
-        "icon": "mdi:microphone" if "stt" in entity_id else "mdi:speaker",
-        "unique_id": "voice_last_stt_001" if "stt" in entity_id else "voice_last_tts_001",
-        "device_info": device_info,
-        "timestamp": datetime.now().isoformat()
-    }
-    
-    if attributes:
-        base_attributes.update(attributes)
-    
-    data = {
-        "state": state,
-        "attributes": base_attributes
-    }
-    
-    try:
-        print(f"[DEBUG] 최종 전송 데이터:", flush=True)
-        print(json.dumps(data, indent=2, ensure_ascii=False), flush=True)
-        
-        response = requests.post(url, json=data, headers=headers, timeout=5)
-        
-        print(f"[DEBUG] 응답: {response.status_code} - {response.text[:100]}", flush=True)
-        
-        if response.status_code in [200, 201]:
-            print(f"[SUCCESS] 센서 업데이트 성공: {entity_id}", flush=True)
-            return True
-        else:
-            print(f"[ERROR] 센서 업데이트 실패", flush=True)
-            return False
-    except Exception as e:
-        print(f"[ERROR] 예외: {e}", flush=True)
-        return False
-
-def fire_ha_event(event_type: str, event_data: dict):
-    """Home Assistant 이벤트 발생"""
-    options = load_options()
-    ha_ip = options.get('ha_ip', '192.168.219.111')
-    ha_url = f"http://{ha_ip}:8123/api"
-    token = get_ha_token()
-    
-    if not token:
-        print(f"[WARNING] 토큰 없음 - 이벤트 발생 건너뜀: {event_type}", flush=True)
-        return False
-    
-    url = f"{ha_url}/events/{event_type}"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-    
-    try:
-        print(f"[DEBUG] 이벤트 발생 시도: {event_type}", flush=True)
-        
-        response = requests.post(url, json=event_data, headers=headers, timeout=5)
-        
-        print(f"[DEBUG] 이벤트 응답 상태 코드: {response.status_code}", flush=True)
-        
-        if response.status_code in [200, 201]:
-            print(f"[INFO] 이벤트 발생 성공: {event_type}", flush=True)
-            return True
-        else:
-            print(f"[ERROR] 이벤트 발생 실패: {event_type}", flush=True)
-            print(f"[ERROR] 응답: {response.text}", flush=True)
-            return False
-    except Exception as e:
-        print(f"[ERROR] 이벤트 발생 예외: {event_type}, {e}", flush=True)
-        import traceback
-        traceback.print_exc()
-        return False
 
 # ==================== STT 엔드포인트 ====================
 @app.route('/stt', methods=['POST'])
@@ -170,18 +66,6 @@ def speech_to_text():
             text = recognizer.recognize_google(audio_data, language=language)
             
             timestamp = datetime.now().isoformat()
-            
-            # 1. Home Assistant 센서 업데이트
-            update_ha_sensor(
-                "sensor.voice_last_stt",
-                text,
-                {
-                    "friendly_name": "마지막 음성 인식",
-                    "icon": "mdi:microphone",
-                    "timestamp": timestamp,
-                    "language": language
-                }
-            )
             
             # 2. Home Assistant 이벤트 발생
             fire_ha_event("voice_stt", {
@@ -233,25 +117,6 @@ def text_to_speech():
         
         timestamp = datetime.now().isoformat()
         
-        # 별 별 별 TTS 전에 텍스트 이벤트 먼저 발생 별 별 별
-        fire_ha_event("google.tts_text", {
-            "text": text,
-            "timestamp": timestamp,
-            "language": tts_lang
-        })
-        
-        # 1. Home Assistant 센서 업데이트
-        update_ha_sensor(
-            "sensor.voice_last_tts",
-            text,
-            {
-                "friendly_name": "마지막 음성 출력",
-                "icon": "mdi:speaker",
-                "timestamp": timestamp,
-                "language": tts_lang
-            }
-        )
-        
         # 2. Home Assistant 이벤트 발생 (기존 voice_tts 이벤트)
         fire_ha_event("voice_tts", {
             "text": text,
@@ -293,8 +158,7 @@ def info():
         "api_port": options.get('api_port', 5007),
         "stt_wyoming_port": options.get('stt_wyoming_port', 10300),
         "tts_wyoming_port": options.get('tts_wyoming_port', 10400),
-        "language": options.get('language', 'ko-KR'),
-        "ha_integration": get_ha_token() is not None
+        "language": options.get('language', 'ko-KR')
     })
 
 if __name__ == '__main__':
@@ -307,48 +171,7 @@ if __name__ == '__main__':
     print(f"STT Wyoming 포트: {options.get('stt_wyoming_port', 10300)}", flush=True)
     print(f"TTS Wyoming 포트: {options.get('tts_wyoming_port', 10400)}", flush=True)
     print(f"언어: {options.get('language', 'ko-KR')}", flush=True)
-    token = get_ha_token()
-    print(f"HA 통합: {'활성화' if token else '비활성화'}", flush=True)
     print("=" * 60, flush=True)
-    
-    # 시작 시 센서 초기화 테스트
-    if token:
-        print("\n[INFO] 센서 초기화 테스트 중...", flush=True)
-        
-        # 초기 센서 생성
-        test_stt = update_ha_sensor(
-            "sensor.voice_last_stt",
-            "대기 중...",
-            {
-                "friendly_name": "마지막 음성 인식",
-                "icon": "mdi:microphone",
-                "timestamp": datetime.now().isoformat()
-            }
-        )
-        
-        test_tts = update_ha_sensor(
-            "sensor.voice_last_tts",
-            "대기 중...",
-            {
-                "friendly_name": "마지막 음성 출력",
-                "icon": "mdi:speaker",
-                "timestamp": datetime.now().isoformat()
-            }
-        )
-        
-        if test_stt and test_tts:
-            print("[INFO] 센서 초기화 성공!", flush=True)
-            print("[INFO] Home Assistant에서 다음 센서를 확인하세요:", flush=True)
-            print("[INFO]   - sensor.voice_last_stt", flush=True)
-            print("[INFO]   - sensor.voice_last_tts", flush=True)
-        else:
-            print("[WARNING] 센서 초기화 실패. 위 로그를 확인하세요.", flush=True)
-        
-        print("=" * 60, flush=True)
-    else:
-        print("\n[WARNING] SUPERVISOR_TOKEN이 없어 센서를 생성할 수 없습니다.", flush=True)
-        print("[INFO] config.yaml에서 homeassistant_api: true 확인하세요.", flush=True)
-        print("=" * 60, flush=True)
     
     print("\n[INFO] Flask 서버 시작 중...\n", flush=True)
     app.run(host='0.0.0.0', port=api_port, debug=False)
