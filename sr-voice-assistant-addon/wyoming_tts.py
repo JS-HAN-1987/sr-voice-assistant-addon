@@ -217,6 +217,11 @@ async def main():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.DEBUG, # INFO에서 DEBUG로 변경
+        format='[%(levelname)s] %(message)s'
+    )
+
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
