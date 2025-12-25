@@ -1,6 +1,6 @@
 name: "SR Voice Assistant"
 description: "Google STT, TTS 서버 (REST API + Wyoming Protocol)"
-version: "1.2.0"
+version: "1.2.1"
 slug: "sr_voice_assistant"
 init: false
 arch:
@@ -23,8 +23,8 @@ options:
   language: "ko-KR"
   mqtt_host: "core-mosquitto"
   mqtt_port: 1883
-  mqtt_user: ""
-  mqtt_password: ""
+  mqtt_user: "dooly"
+  mqtt_password: "zz0303"
   mqtt_discovery_prefix: "homeassistant"
 schema:
   api_port: int

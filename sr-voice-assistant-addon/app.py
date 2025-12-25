@@ -60,10 +60,17 @@ def init_mqtt():
     options = load_options()
     mqtt_host = options.get('mqtt_host', 'core-mosquitto')
     mqtt_port = int(options.get('mqtt_port', 1883))
-    mqtt_user = options.get('mqtt_user', '')
+    mqtt_user = options.get('mqtt_user', 'homeassistant')  # 기본값 변경
     mqtt_password = options.get('mqtt_password', '')
     mqtt_discovery_prefix = options.get('mqtt_discovery_prefix', 'homeassistant')
     
+    
+    print(f"[MQTT] 연결 설정:", flush=True)
+    print(f"[MQTT]   호스트: {mqtt_host}", flush=True)
+    print(f"[MQTT]   포트: {mqtt_port}", flush=True)
+    print(f"[MQTT]   사용자: {mqtt_user}", flush=True)
+    print(f"[MQTT]   비밀번호: {'설정됨' if mqtt_password else '없음'}", flush=True)
+
     # 고유한 client_id 생성
     client_id = f"sr_voice_assistant_{str(uuid.uuid4())[:8]}"
     
