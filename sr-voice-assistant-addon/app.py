@@ -193,11 +193,22 @@ def register_mqtt_discovery():
     except Exception as e:
         print(f"[MQTT] ✗ Discovery 등록 실패: {e}", flush=True)
 
+# publish_mqtt_sensor 함수 시작 부분에 추가
 def publish_mqtt_sensor(entity_type: str, state: str, attributes: dict = None):
     """MQTT를 통해 센서 상태 발행"""
+    global mqtt_connected
+    
+    # MQTT 연결 상태 체크 및 재시도
     if not mqtt_connected:
-        print(f"[MQTT] ⚠️ 연결되지 않음 - {entity_type} 상태 발행 건너뜀", flush=True)
-        return False
+        print(f"[MQTT] ⚠️ 연결되지 않음 - 재연결 시도", flush=True)
+        init_mqtt()  # 재연결 시도
+        
+        # 잠시 대기
+        time.sleep(0.5)
+        
+        if not mqtt_connected:
+            print(f"[MQTT] ✗ 재연결 실패 - {entity_type} 상태 발행 건너뜀", flush=True)
+            return False
     
     try:
         timestamp = datetime.now().isoformat()
@@ -226,6 +237,9 @@ def publish_mqtt_sensor(entity_type: str, state: str, attributes: dict = None):
         else:
             return False
         
+        print(f"[MQTT] {entity_type.upper()} 발행 시도: {state_topic}", flush=True)
+        print(f"[MQTT] 상태: {state[:100]}...", flush=True)
+        
         # 상태 발행
         mqtt_client.publish(state_topic, state, retain=True)
         
@@ -249,11 +263,13 @@ def publish_mqtt_sensor(entity_type: str, state: str, attributes: dict = None):
             retain=False
         )
         
-        print(f"[MQTT] ✓ {entity_type.upper()} 상태 발행: {state[:50]}...", flush=True)
+        print(f"[MQTT] ✓ {entity_type.upper()} 상태 발행 완료: {state[:50]}...", flush=True)
         return True
         
     except Exception as e:
         print(f"[MQTT] ✗ 상태 발행 실패: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
         return False
 
 # ==================== STT 엔드포인트 ====================
@@ -274,8 +290,10 @@ def speech_to_text():
             
             timestamp = datetime.now().isoformat()
             
-            # MQTT로 상태 발행
-            publish_mqtt_sensor(
+            print(f"[STT] 인식 결과: {text}", flush=True)
+            
+            # ▼▼▼ MQTT로 상태 발행 (REST API 대신) ▼▼▼
+            mqtt_success = publish_mqtt_sensor(
                 "stt",
                 text,
                 {
@@ -287,10 +305,35 @@ def speech_to_text():
                 }
             )
             
+            if mqtt_success:
+                print(f"[MQTT] STT 상태 발행 성공: {text[:50]}...", flush=True)
+            else:
+                print(f"[MQTT] STT 상태 발행 실패", flush=True)
+                # MQTT 실패 시 REST API로 폴백
+                update_ha_sensor(
+                    "sensor.voice_last_stt",
+                    text,
+                    {
+                        "friendly_name": "마지막 음성 인식",
+                        "icon": "mdi:microphone",
+                        "timestamp": timestamp,
+                        "language": language
+                    }
+                )
+            # ▲▲▲ 여기까지 ▲▲▲
+            
+            # 이벤트 발생 (옵션)
+            fire_ha_event("voice_stt", {
+                "text": text,
+                "timestamp": timestamp,
+                "language": language
+            })
+            
             return json_response({
                 "result": text,
                 "timestamp": timestamp,
-                "language": language
+                "language": language,
+                "mqtt_published": mqtt_success
             })
             
     except sr.UnknownValueError:
@@ -331,8 +374,11 @@ def text_to_speech():
         
         timestamp = datetime.now().isoformat()
         
-        # MQTT로 상태 발행
-        publish_mqtt_sensor(
+        print(f"[TTS] 변환 텍스트: {text}", flush=True)
+        print(f"[TTS] 언어: {tts_lang}", flush=True)
+        
+        # ▼▼▼ MQTT로 상태 발행 (REST API 대신) ▼▼▼
+        mqtt_success = publish_mqtt_sensor(
             "tts",
             text,
             {
@@ -344,11 +390,38 @@ def text_to_speech():
             }
         )
         
+        if mqtt_success:
+            print(f"[MQTT] TTS 상태 발행 성공: {text[:50]}...", flush=True)
+        else:
+            print(f"[MQTT] TTS 상태 발행 실패", flush=True)
+            # MQTT 실패 시 REST API로 폴백
+            update_ha_sensor(
+                "sensor.voice_last_tts",
+                text,
+                {
+                    "friendly_name": "마지막 음성 출력",
+                    "icon": "mdi:speaker",
+                    "timestamp": timestamp,
+                    "language": tts_lang
+                }
+            )
+        # ▲▲▲ 여기까지 ▲▲▲
+        
+        # 이벤트 발생 (옵션)
+        fire_ha_event("voice_tts", {
+            "text": text,
+            "timestamp": timestamp,
+            "language": tts_lang
+        })
+        
         # gTTS로 음성 생성
         tts = gTTS(text=text, lang=tts_lang, slow=False)
         audio_buffer = io.BytesIO()
         tts.write_to_fp(audio_buffer)
         audio_buffer.seek(0)
+        
+        file_size = len(audio_buffer.getvalue())
+        print(f"[TTS] 음성 파일 생성 완료: {file_size} bytes", flush=True)
         
         return send_file(
             audio_buffer,
@@ -392,6 +465,55 @@ def info():
         }
     })
 
+# ==================== MQTT 테스트 엔드포인트 ====================
+@app.route('/mqtt-test', methods=['POST'])
+def mqtt_test():
+    """MQTT 연결 테스트"""
+    try:
+        if request.is_json:
+            data = request.get_json()
+            test_text = data.get('text', '테스트 메시지')
+        else:
+            test_text = request.form.get('text', '테스트 메시지')
+        
+        print(f"[MQTT-TEST] 테스트 시작: {test_text}", flush=True)
+        
+        # STT 테스트
+        stt_success = publish_mqtt_sensor("stt", f"테스트: {test_text}", {
+            "friendly_name": "마지막 음성 인식",
+            "icon": "mdi:microphone",
+            "timestamp": datetime.now().isoformat(),
+            "test": True
+        })
+        
+        # TTS 테스트
+        tts_success = publish_mqtt_sensor("tts", f"테스트: {test_text}", {
+            "friendly_name": "마지막 음성 출력",
+            "icon": "mdi:speaker",
+            "timestamp": datetime.now().isoformat(),
+            "test": True
+        })
+        
+        return json_response({
+            "mqtt_connected": mqtt_connected,
+            "stt_published": stt_success,
+            "tts_published": tts_success,
+            "test_text": test_text,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return json_response({"error": f"테스트 실패: {str(e)}"}, 500)
+
+@app.route('/mqtt-status', methods=['GET'])
+def mqtt_status():
+    """MQTT 상태 확인"""
+    return json_response({
+        "connected": mqtt_connected,
+        "discovery_prefix": mqtt_discovery_prefix,
+        "timestamp": datetime.now().isoformat()
+    })
+
 if __name__ == '__main__':
     options = load_options()
     api_port = options.get('api_port', 5007)
@@ -414,8 +536,8 @@ if __name__ == '__main__':
         print(f"[INFO]   - sensor.sr_voice_last_stt", flush=True)
         print(f"[INFO]   - sensor.sr_voice_last_tts", flush=True)
         
-        # 초기 상태 설정
-        time.sleep(1)  # MQTT 연결 안정화 대기
+        # 초기 상태 설정 (MQTT로)
+        time.sleep(2)  # MQTT 연결 안정화 대기
         initial_time = datetime.now().isoformat()
         
         publish_mqtt_sensor("stt", "대기 중...", {
@@ -435,9 +557,33 @@ if __name__ == '__main__':
         print("[INFO] ✓ 초기 상태 설정 완료", flush=True)
     else:
         print("[WARNING] ✗ MQTT 연결 실패", flush=True)
-        print("[INFO] MQTT 브로커 설정을 확인하세요.", flush=True)
-        print("[INFO] 1. Mosquitto 애드온이 설치되어 있는지 확인", flush=True)
-        print("[INFO] 2. 옵션에서 MQTT 설정이 올바른지 확인", flush=True)
+        print("[INFO] REST API를 사용하여 센서 초기화...", flush=True)
+        
+        # MQTT 실패 시 REST API로 폴백
+        token = get_ha_token()
+        if token:
+            update_ha_sensor(
+                "sensor.voice_last_stt",
+                "대기 중...",
+                {
+                    "friendly_name": "마지막 음성 인식",
+                    "icon": "mdi:microphone",
+                    "timestamp": datetime.now().isoformat()
+                }
+            )
+            
+            update_ha_sensor(
+                "sensor.voice_last_tts",
+                "대기 중...",
+                {
+                    "friendly_name": "마지막 음성 출력",
+                    "icon": "mdi:speaker",
+                    "timestamp": datetime.now().isoformat()
+                }
+            )
+            print("[INFO] ✓ REST API 센서 초기화 완료", flush=True)
+        else:
+            print("[WARNING] ✗ REST API도 사용 불가", flush=True)
     
     print("=" * 60, flush=True)
     print("\n[INFO] Flask 서버 시작 중...\n", flush=True)
@@ -450,6 +596,7 @@ if __name__ == '__main__':
         if mqtt_client:
             # 오프라인 상태 알림
             mqtt_client.publish(f"{mqtt_discovery_prefix}/status", "offline", retain=True)
+            time.sleep(0.5)
             mqtt_client.loop_stop()
             print("[MQTT] 클라이언트 종료", flush=True)
     
