@@ -74,12 +74,24 @@ def update_ha_sensor(entity_id: str, state: str, attributes: dict = None):
         "Content-Type": "application/json"
     }
 
-
+    base_attributes = {
+        "friendly_name": "마지막 음성 인식" if "stt" in entity_id else "마지막 음성 출력",
+        "icon": "mdi:microphone" if "stt" in entity_id else "mdi:speaker",
+    }
+    
+    if attributes:
+        base_attributes.update(attributes)
     
     data = {
         "state": state,
         "attributes": attributes or {}
     }
+
+
+    if "sensor.voice_last_stt" in entity_id:
+        data["attributes"]["unique_id"] = "voice_last_stt_001"
+    elif "sensor.voice_last_tts" in entity_id:
+        data["attributes"]["unique_id"] = "voice_last_tts_001"
     
     try:
         print(f"[DEBUG] 센서 업데이트 시도: {entity_id}", flush=True)

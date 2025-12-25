@@ -1,6 +1,6 @@
 name: "SR Voice Assistant"
 description: "Google STT, TTS 서버 (REST API + Wyoming Protocol)"
-version: "1.1.0"
+version: "1.1.1"
 slug: "sr_voice_assistant"
 init: false
 arch:
