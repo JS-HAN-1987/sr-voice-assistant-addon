@@ -74,7 +74,6 @@ def update_ha_sensor(entity_id: str, state: str, attributes: dict = None):
         "Content-Type": "application/json"
     }
     
-    # ▼▼▼ **이 부분이 핵심** ▼▼▼
     # device_info 추가
     device_info = {
         "identifiers": ["sr_voice_assistant"],
@@ -87,7 +86,7 @@ def update_ha_sensor(entity_id: str, state: str, attributes: dict = None):
         "friendly_name": "마지막 음성 인식" if "stt" in entity_id else "마지막 음성 출력",
         "icon": "mdi:microphone" if "stt" in entity_id else "mdi:speaker",
         "unique_id": "voice_last_stt_001" if "stt" in entity_id else "voice_last_tts_001",
-        "device_info": device_info,  # ← 이게 중요!
+        "device_info": device_info,
         "timestamp": datetime.now().isoformat()
     }
     
@@ -98,7 +97,6 @@ def update_ha_sensor(entity_id: str, state: str, attributes: dict = None):
         "state": state,
         "attributes": base_attributes
     }
-    # ▲▲▲ 여기까지 ▲▲▲
     
     try:
         print(f"[DEBUG] 최종 전송 데이터:", flush=True)
@@ -109,10 +107,10 @@ def update_ha_sensor(entity_id: str, state: str, attributes: dict = None):
         print(f"[DEBUG] 응답: {response.status_code} - {response.text[:100]}", flush=True)
         
         if response.status_code in [200, 201]:
-            print(f"[SUCCESS] ✓ 센서 업데이트 성공: {entity_id}", flush=True)
+            print(f"[SUCCESS] 센서 업데이트 성공: {entity_id}", flush=True)
             return True
         else:
-            print(f"[ERROR] ✗ 센서 업데이트 실패", flush=True)
+            print(f"[ERROR] 센서 업데이트 실패", flush=True)
             return False
     except Exception as e:
         print(f"[ERROR] 예외: {e}", flush=True)
@@ -143,14 +141,14 @@ def fire_ha_event(event_type: str, event_data: dict):
         print(f"[DEBUG] 이벤트 응답 상태 코드: {response.status_code}", flush=True)
         
         if response.status_code in [200, 201]:
-            print(f"[INFO] ✓ 이벤트 발생 성공: {event_type}", flush=True)
+            print(f"[INFO] 이벤트 발생 성공: {event_type}", flush=True)
             return True
         else:
-            print(f"[ERROR] ✗ 이벤트 발생 실패: {event_type}", flush=True)
+            print(f"[ERROR] 이벤트 발생 실패: {event_type}", flush=True)
             print(f"[ERROR] 응답: {response.text}", flush=True)
             return False
     except Exception as e:
-        print(f"[ERROR] ✗ 이벤트 발생 예외: {event_type}, {e}", flush=True)
+        print(f"[ERROR] 이벤트 발생 예외: {event_type}, {e}", flush=True)
         import traceback
         traceback.print_exc()
         return False
@@ -235,6 +233,13 @@ def text_to_speech():
         
         timestamp = datetime.now().isoformat()
         
+        # 별 별 별 TTS 전에 텍스트 이벤트 먼저 발생 별 별 별
+        fire_ha_event("google.tts_text", {
+            "text": text,
+            "timestamp": timestamp,
+            "language": tts_lang
+        })
+        
         # 1. Home Assistant 센서 업데이트
         update_ha_sensor(
             "sensor.voice_last_tts",
@@ -247,7 +252,7 @@ def text_to_speech():
             }
         )
         
-        # 2. Home Assistant 이벤트 발생
+        # 2. Home Assistant 이벤트 발생 (기존 voice_tts 이벤트)
         fire_ha_event("voice_tts", {
             "text": text,
             "timestamp": timestamp,
@@ -284,7 +289,7 @@ def info():
     options = load_options()
     return json_response({
         "name": "SR Voice Assistant",
-        "version": "1.0.0",
+        "version": "1.1.3",
         "api_port": options.get('api_port', 5007),
         "stt_wyoming_port": options.get('stt_wyoming_port', 10300),
         "tts_wyoming_port": options.get('tts_wyoming_port', 10400),
@@ -332,12 +337,12 @@ if __name__ == '__main__':
         )
         
         if test_stt and test_tts:
-            print("[INFO] ✓ 센서 초기화 성공!", flush=True)
+            print("[INFO] 센서 초기화 성공!", flush=True)
             print("[INFO] Home Assistant에서 다음 센서를 확인하세요:", flush=True)
             print("[INFO]   - sensor.voice_last_stt", flush=True)
             print("[INFO]   - sensor.voice_last_tts", flush=True)
         else:
-            print("[WARNING] ✗ 센서 초기화 실패. 위 로그를 확인하세요.", flush=True)
+            print("[WARNING] 센서 초기화 실패. 위 로그를 확인하세요.", flush=True)
         
         print("=" * 60, flush=True)
     else:

@@ -58,7 +58,15 @@ language: ko-KR             # 기본 언어
     language: "ko-KR"
   ```
 
-- `voice_tts` - TTS 완료 시 발생
+- **`google.tts_text`** - **TTS 음성 생성 전에 먼저 발생** ⭐ NEW
+  ```yaml
+  event_data:
+    text: "거실 불을 켰습니다"
+    timestamp: "2024-12-25T10:30:01"
+    language: "ko"
+  ```
+
+- `voice_tts` - TTS 음성 생성 후 발생
   ```yaml
   event_data:
     text: "거실 불을 켰습니다"
@@ -129,6 +137,20 @@ hours_to_show: 24
 
 ### 5. 자동화 예제
 
+#### TTS 전에 텍스트 받기 (google.tts_text 이벤트) ⭐ NEW
+```yaml
+automation:
+  - alias: "TTS 전 텍스트 받기"
+    trigger:
+      - platform: event
+        event_type: google.tts_text
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "🔊 음성 출력 예정"
+          message: "{{ trigger.event.data.text }}"
+```
+
 #### 대화 내용을 알림으로 보내기
 ```yaml
 automation:
@@ -182,6 +204,19 @@ automation:
         data:
           title: "⚠️ 긴급 음성 감지"
           message: "{{ trigger.event.data.text }}"
+```
+
+#### TTS 텍스트를 ESPHome으로 전송하기 ⭐ NEW
+```yaml
+automation:
+  - alias: "TTS를 ESPHome으로 전송"
+    trigger:
+      - platform: event
+        event_type: google.tts_text
+    action:
+      - service: esphome.esp32_speaker_play_tts
+        data:
+          text: "{{ trigger.event.data.text }}"
 ```
 
 #### 대화 내용을 파일에 저장 (CSV, JSON 등)
@@ -247,6 +282,17 @@ cards:
     hours_to_show: 12
 ```
 
+## 이벤트 순서
+
+TTS 요청 시 다음 순서로 이벤트가 발생합니다:
+
+1. **`google.tts_text`** - 음성 생성 전 텍스트 전송 (가장 먼저)
+2. **`sensor.voice_last_tts`** - 센서 업데이트
+3. **`voice_tts`** - TTS 완료 이벤트
+4. **음성 파일 생성 및 반환**
+
+이를 활용하여 TTS 음성이 생성되기 전에 텍스트를 ESPHome이나 다른 시스템으로 먼저 보낼 수 있습니다!
+
 ## REST API 사용법
 
 ### STT - 음성을 텍스트로
@@ -299,7 +345,7 @@ curl -X POST http://homeassistant.local:5007/tts \
 
 ### 이벤트가 발생하지 않을 때
 1. 개발자 도구 → 이벤트에서 수신 대기
-2. `voice_stt` 또는 `voice_tts` 입력 후 "이벤트 수신 시작"
+2. `google.tts_text`, `voice_stt` 또는 `voice_tts` 입력 후 "이벤트 수신 시작"
 3. 음성 인식/출력 테스트
 4. 애드온 로그 확인
 
@@ -344,4 +390,6 @@ JS-HAN-1987
 
 ## 버전 히스토리
 
+- **1.1.3**: TTS 전 `google.tts_text` 이벤트 추가 - TTS 음성 생성 전에 텍스트를 먼저 전송
+- **1.1.2**: 센서 및 이벤트 통합 개선
 - **1.0.0**: 초기 릴리스 (STT + TTS + HA 이벤트/센서 통합)
