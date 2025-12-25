@@ -29,7 +29,7 @@ def load_options():
         try:
             with open(options_file, "r") as f:
                 options = json.load(f)
-                
+
                 # 옵션 파일에 토큰이 있으면 환경변수에 설정
                 if 'api_token' in options:
                     os.environ['SR_VOICE_TOKEN'] = options['api_token']
@@ -47,6 +47,51 @@ def load_options():
         "ha_ip": "192.168.219.111"
     }
 
+def get_ha_token():
+    """Supervisor 토큰 가져오기"""
+    token = os.environ.get('SR_VOICE_TOKEN')
+    if not token:
+        print("[WARNING] SR_VOICE_TOKEN 없습니다.", flush=True)
+    else:
+        print(f"[INFO] SR_VOICE_TOKEN 확인됨 (길이: {len(token)})", flush=True)
+    return token
+
+def fire_ha_event(event_type: str, event_data: dict):
+    """Home Assistant 이벤트 발생"""
+    options = load_options()
+    ha_ip = options.get('ha_ip', '192.168.219.111')
+    ha_url = f"http://{ha_ip}:8123/api"
+    token = get_ha_token()
+    
+    if not token:
+        print(f"[WARNING] 토큰 없음 - 이벤트 발생 건너뜀: {event_type}", flush=True)
+        return False
+    
+    url = f"{ha_url}/events/{event_type}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        print(f"[DEBUG] 이벤트 발생 시도: {event_type}", flush=True)
+        
+        response = requests.post(url, json=event_data, headers=headers, timeout=5)
+        
+        print(f"[DEBUG] 이벤트 응답 상태 코드: {response.status_code}", flush=True)
+        
+        if response.status_code in [200, 201]:
+            print(f"[INFO] 이벤트 발생 성공: {event_type}", flush=True)
+            return True
+        else:
+            print(f"[ERROR] 이벤트 발생 실패: {event_type}", flush=True)
+            print(f"[ERROR] 응답: {response.text}", flush=True)
+            return False
+    except Exception as e:
+        print(f"[ERROR] 이벤트 발생 예외: {event_type}, {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return False
 
 
 # ==================== STT 엔드포인트 ====================
