@@ -1,6 +1,6 @@
 name: "SR Voice Assistant"
 description: "Google STT, TTS 서버 (REST API + Wyoming Protocol)"
-version: "1.1.2"
+version: "1.2.0"
 slug: "sr_voice_assistant"
 init: false
 arch:
@@ -9,18 +9,30 @@ arch:
   - armv7
   - armhf
 ports:
-  5006/tcp: 5006
+  5007/tcp: 5007
+  10300/tcp: 10300
   10400/tcp: 10400
 ports_description:
-  5006/tcp: "REST API 포트"
-  10400/tcp: "Wyoming Protocol 포트 (HA 음성 어시스턴트)"
+  5007/tcp: "REST API 포트"
+  10300/tcp: "Wyoming STT 포트"
+  10400/tcp: "Wyoming TTS 포트"
 options:
-  port: 5006
-  language: "ko"
-  ha_ip: "192.168.219.111"
-  api_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIwZDdkYzI4ODNmOTA0MGJkYjE5NzI4NDk3OWRjMTg1NCIsImlhdCI6MTc2NjY0NjUzNCwiZXhwIjoyMDgyMDA2NTM0fQ.tBByqQKlkz-OquBVuTXbjlPPgVQe2T_mEWqcWgKXlfU"
+  api_port: 5007
+  stt_wyoming_port: 10300
+  tts_wyoming_port: 10400
+  language: "ko-KR"
+  mqtt_host: "core-mosquitto"
+  mqtt_port: 1883
+  mqtt_user: ""
+  mqtt_password: ""
+  mqtt_discovery_prefix: "homeassistant"
 schema:
-  port: int
+  api_port: int
+  stt_wyoming_port: int
+  tts_wyoming_port: int
   language: str
-  ha_ip: str
-  api_token: str
+  mqtt_host: str
+  mqtt_port: int
+  mqtt_user: str?
+  mqtt_password: password?
+  mqtt_discovery_prefix: str?
