@@ -44,17 +44,18 @@ def get_ha_token():
     """Supervisor 토큰 가져오기"""
     token = os.environ.get('SUPERVISOR_TOKEN')
     if not token:
-        print("[WARNING] SUPERVISOR_TOKEN이 없습니다. HA 통합 기능이 제한됩니다.", flush=True)
+        print("[WARNING] SUPERVISOR_TOKEN이 없습니다.", flush=True)
+    else:
+        print(f"[INFO] SUPERVISOR_TOKEN 확인됨 (길이: {len(token)})", flush=True)
     return token
 
 def update_ha_sensor(entity_id: str, state: str, attributes: dict = None):
     """Home Assistant 센서 상태 업데이트"""
-    options = load_options()
     ha_url = "http://supervisor/core/api"
     token = get_ha_token()
     
     if not token:
-        print(f"[WARNING] 토큰 없음 - 센서 업데이트 실패: {entity_id}", flush=True)
+        print(f"[WARNING] 토큰 없음 - 센서 업데이트 건너뜀: {entity_id}", flush=True)
         return False
     
     url = f"{ha_url}/states/{entity_id}"
@@ -69,15 +70,27 @@ def update_ha_sensor(entity_id: str, state: str, attributes: dict = None):
     }
     
     try:
+        print(f"[DEBUG] 센서 업데이트 시도: {entity_id}", flush=True)
+        print(f"[DEBUG] URL: {url}", flush=True)
+        print(f"[DEBUG] State: {state[:50] if len(state) > 50 else state}", flush=True)
+        
         response = requests.post(url, json=data, headers=headers, timeout=5)
+        
+        print(f"[DEBUG] 응답 상태 코드: {response.status_code}", flush=True)
+        
         if response.status_code in [200, 201]:
-            print(f"[INFO] 센서 업데이트 성공: {entity_id}", flush=True)
+            print(f"[INFO] ✓ 센서 업데이트 성공: {entity_id}", flush=True)
             return True
         else:
-            print(f"[ERROR] 센서 업데이트 실패: {entity_id}, 상태: {response.status_code}", flush=True)
+            print(f"[ERROR] ✗ 센서 업데이트 실패: {entity_id}", flush=True)
+            print(f"[ERROR] 상태 코드: {response.status_code}", flush=True)
+            print(f"[ERROR] 응답 내용: {response.text}", flush=True)
             return False
     except Exception as e:
-        print(f"[ERROR] 센서 업데이트 예외: {entity_id}, {e}", flush=True)
+        print(f"[ERROR] ✗ 센서 업데이트 예외: {entity_id}", flush=True)
+        print(f"[ERROR] 예외 내용: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
         return False
 
 def fire_ha_event(event_type: str, event_data: dict):
@@ -86,7 +99,7 @@ def fire_ha_event(event_type: str, event_data: dict):
     token = get_ha_token()
     
     if not token:
-        print(f"[WARNING] 토큰 없음 - 이벤트 발생 실패: {event_type}", flush=True)
+        print(f"[WARNING] 토큰 없음 - 이벤트 발생 건너뜀: {event_type}", flush=True)
         return False
     
     url = f"{ha_url}/events/{event_type}"
@@ -96,15 +109,23 @@ def fire_ha_event(event_type: str, event_data: dict):
     }
     
     try:
+        print(f"[DEBUG] 이벤트 발생 시도: {event_type}", flush=True)
+        
         response = requests.post(url, json=event_data, headers=headers, timeout=5)
+        
+        print(f"[DEBUG] 이벤트 응답 상태 코드: {response.status_code}", flush=True)
+        
         if response.status_code in [200, 201]:
-            print(f"[INFO] 이벤트 발생 성공: {event_type}", flush=True)
+            print(f"[INFO] ✓ 이벤트 발생 성공: {event_type}", flush=True)
             return True
         else:
-            print(f"[ERROR] 이벤트 발생 실패: {event_type}, 상태: {response.status_code}", flush=True)
+            print(f"[ERROR] ✗ 이벤트 발생 실패: {event_type}", flush=True)
+            print(f"[ERROR] 응답: {response.text}", flush=True)
             return False
     except Exception as e:
-        print(f"[ERROR] 이벤트 발생 예외: {event_type}, {e}", flush=True)
+        print(f"[ERROR] ✗ 이벤트 발생 예외: {event_type}, {e}", flush=True)
+        import traceback
+        traceback.print_exc()
         return False
 
 # ==================== STT 엔드포인트 ====================
@@ -254,7 +275,48 @@ if __name__ == '__main__':
     print(f"STT Wyoming 포트: {options.get('stt_wyoming_port', 10300)}", flush=True)
     print(f"TTS Wyoming 포트: {options.get('tts_wyoming_port', 10400)}", flush=True)
     print(f"언어: {options.get('language', 'ko-KR')}", flush=True)
-    print(f"HA 통합: {'활성화' if get_ha_token() else '비활성화'}", flush=True)
+    token = get_ha_token()
+    print(f"HA 통합: {'활성화' if token else '비활성화'}", flush=True)
     print("=" * 60, flush=True)
     
+    # 시작 시 센서 초기화 테스트
+    if token:
+        print("\n[INFO] 센서 초기화 테스트 중...", flush=True)
+        
+        # 초기 센서 생성
+        test_stt = update_ha_sensor(
+            "sensor.voice_last_stt",
+            "대기 중...",
+            {
+                "friendly_name": "마지막 음성 인식",
+                "icon": "mdi:microphone",
+                "timestamp": datetime.now().isoformat()
+            }
+        )
+        
+        test_tts = update_ha_sensor(
+            "sensor.voice_last_tts",
+            "대기 중...",
+            {
+                "friendly_name": "마지막 음성 출력",
+                "icon": "mdi:speaker",
+                "timestamp": datetime.now().isoformat()
+            }
+        )
+        
+        if test_stt and test_tts:
+            print("[INFO] ✓ 센서 초기화 성공!", flush=True)
+            print("[INFO] Home Assistant에서 다음 센서를 확인하세요:", flush=True)
+            print("[INFO]   - sensor.voice_last_stt", flush=True)
+            print("[INFO]   - sensor.voice_last_tts", flush=True)
+        else:
+            print("[WARNING] ✗ 센서 초기화 실패. 위 로그를 확인하세요.", flush=True)
+        
+        print("=" * 60, flush=True)
+    else:
+        print("\n[WARNING] SUPERVISOR_TOKEN이 없어 센서를 생성할 수 없습니다.", flush=True)
+        print("[INFO] config.yaml에서 homeassistant_api: true 확인하세요.", flush=True)
+        print("=" * 60, flush=True)
+    
+    print("\n[INFO] Flask 서버 시작 중...\n", flush=True)
     app.run(host='0.0.0.0', port=api_port, debug=False)
