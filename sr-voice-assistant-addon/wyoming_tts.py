@@ -39,7 +39,7 @@ class GoogleTtsEventHandler(AsyncEventHandler):
                             version="1.0",
                             voices=[
                                 TtsVoice(
-                                    name="ko",
+                                    name="ko-KR",
                                     description="Korean",
                                     attribution=Attribution(
                                         name="Google",
@@ -93,6 +93,13 @@ class GoogleTtsEventHandler(AsyncEventHandler):
             # 텍스트를 음성으로 변환
             synthesize = Synthesize.from_event(event)
             _LOGGER.debug(f"음성 합성 요청: {synthesize.text}")
+
+            # 언어 태그 처리 (ko-KR 이 들어와도 앞의 ko만 추출)
+            requested_lang = synthesize.voice.name if synthesize.voice else self.language
+            if requested_lang.startswith("ko"):
+                target_lang = "ko"
+            else:
+                target_lang = requested_lang
 
             fire_ha_event("voice_tts", {
                 "text": synthesize.text,
