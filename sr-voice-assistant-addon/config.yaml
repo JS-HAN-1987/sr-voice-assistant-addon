@@ -1,6 +1,6 @@
 name: "SR Voice Assistant"
 description: "Google STT, TTS 서버 (Wyoming Protocol)"
-version: "1.4.1"
+version: "1.4.2"
 slug: "sr_voice_assistant"
 init: false
 arch:

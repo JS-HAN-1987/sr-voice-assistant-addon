@@ -24,6 +24,7 @@ class GoogleTtsEventHandler(AsyncEventHandler):
 
     async def handle_event(self, event: Event) -> bool:
         if Describe.is_type(event.type):
+            print(">>> [TYPE] Describe 요청 받음", flush=True)
             # 서버 정보 응답
             await self.write_event(
                 Info(
@@ -143,6 +144,10 @@ class GoogleTtsEventHandler(AsyncEventHandler):
                 _LOGGER.error("음성 합성 실패")
             
             return True
+        # 위 조건들에 해당하지 않는 나머지 이벤트들
+        else:
+            print(f">>> [TYPE] 알 수 없는 이벤트: {event.type}", flush=True)
+            # 여기서 event.data 등을 찍어보면 더 자세한 정보를 알 수 있습니다.
 
         return True
 
