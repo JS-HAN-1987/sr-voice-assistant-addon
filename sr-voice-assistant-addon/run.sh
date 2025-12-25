@@ -4,23 +4,6 @@ echo "========================================"
 echo "SR Voice Assistant 서버 시작 중"
 echo "========================================"
 
-# 환경변수 설정 (MQTT)
-MQTT_HOST=$(bashio::config 'mqtt_host' 'core-mosquitto')
-MQTT_PORT=$(bashio::config 'mqtt_port' 1883)
-MQTT_USER=$(bashio::config 'mqtt_user' '')
-MQTT_PASSWORD=$(bashio::config 'mqtt_password' '')
-
-echo "[INFO] MQTT 설정:"
-echo "[INFO]   호스트: $MQTT_HOST"
-echo "[INFO]   포트: $MQTT_PORT"
-echo "[INFO]   사용자: ${MQTT_USER:-없음}"
-
-# MQTT 환경변수 설정
-export MQTT_HOST="$MQTT_HOST"
-export MQTT_PORT="$MQTT_PORT"
-export MQTT_USER="$MQTT_USER"
-export MQTT_PASSWORD="$MQTT_PASSWORD"
-
 # Flask REST API 서버 백그라운드 실행
 echo "[INFO] Flask API 서버 시작..."
 python3 /app.py &
