@@ -9,7 +9,7 @@ from wyoming.event import Event
 from wyoming.info import Describe, Info, Attribution, AsrProgram, AsrModel
 from wyoming.server import AsyncEventHandler, AsyncServer
 from wyoming.asr import Transcribe, Transcript
-from utils import fire_ha_event, load_options # 추가
+from utils import send_to_chat_ui, load_options
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class GoogleSttEventHandler(AsyncEventHandler):
 
     async def handle_event(self, event: Event) -> bool:
         if Describe.is_type(event.type):
-            # 서버 정보 응답
+
             await self.write_event(
                 Info(
                     asr=[
@@ -59,31 +59,30 @@ class GoogleSttEventHandler(AsyncEventHandler):
             return True
 
         if AudioStart.is_type(event.type):
-            # 오디오 수신 시작
+
             self.is_receiving = True
             self.audio_buffer = bytearray()
             _LOGGER.debug("오디오 수신 시작")
             return True
 
         if AudioChunk.is_type(event.type):
-            # 오디오 데이터 수신
+
             if self.is_receiving:
                 chunk = AudioChunk.from_event(event)
                 self.audio_buffer.extend(chunk.audio)
             return True
 
         if AudioStop.is_type(event.type):
-            # 오디오 수신 완료, 인식 시작
+
             self.is_receiving = False
             _LOGGER.debug(f"오디오 수신 완료: {len(self.audio_buffer)} bytes")
             
-            # 비동기로 음성 인식 실행
+            # 음성 인식 실행
             text = await self._recognize_speech()
             if text:
-                fire_ha_event("voice_stt", {
-                    "text": text,
-                    "language": self.language
-                })
+                # Chat UI로 직접 전송 (user role)
+                loop = asyncio.get_running_loop()
+                loop.run_in_executor(None, send_to_chat_ui, "user", text)
 
             # 결과 전송
             await self.write_event(
@@ -93,7 +92,7 @@ class GoogleSttEventHandler(AsyncEventHandler):
             return True
 
         if Transcribe.is_type(event.type):
-            # 직접 전사 요청
+
             _LOGGER.debug("Transcribe 요청")
             return True
 
@@ -104,7 +103,7 @@ class GoogleSttEventHandler(AsyncEventHandler):
         loop = asyncio.get_event_loop()
         
         try:
-            # speech_recognition 라이브러리는 동기 함수이므로 executor에서 실행
+
             audio_data = sr.AudioData(bytes(self.audio_buffer), 16000, 2)
             text = await loop.run_in_executor(
                 None,
@@ -135,7 +134,7 @@ async def main():
         format='[%(levelname)s] %(message)s'
     )
     
-    # 설정
+
     host = "0.0.0.0"
     port = 10300
     language = "ko-KR"
@@ -147,7 +146,7 @@ async def main():
         _LOGGER.info(f"언어: {language}")
         _LOGGER.info("=" * 50)
         
-        # 서버 시작
+
         server = AsyncServer.from_uri(f"tcp://{host}:{port}")
         
         _LOGGER.info("서버 리스닝 중...")
