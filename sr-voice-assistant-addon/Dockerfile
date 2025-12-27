@@ -16,7 +16,6 @@ RUN apk add --no-cache \
 COPY run.sh /
 COPY wyoming_stt.py /
 COPY wyoming_tts.py /
-COPY utils.py /
 COPY app.py /
 COPY requirements.txt /
 
