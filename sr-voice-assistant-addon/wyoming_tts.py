@@ -23,6 +23,10 @@ class GoogleTtsEventHandler(AsyncEventHandler):
         self.language = language
 
     async def handle_event(self, event: Event) -> bool:
+        _LOGGER.info(
+            f"[EVENT] type={event.type} data={event.data if hasattr(event, 'data') else event}"
+        )
+
         if Describe.is_type(event.type):
 
 
