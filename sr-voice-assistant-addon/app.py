@@ -1,13 +1,110 @@
 import json
 import os
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template_string, request, jsonify, send_from_directory
 from flask_socketio import SocketIO
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 DB_FILE = '/data/chat_db.json'
+
+# HTML 템플릿 (인라인)
+HTML_TEMPLATE = """<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>음성 대화 기록</title>
+    <style>
+body {
+    margin: 0;
+    font-family: "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    background-color: #e5e5e5;
+}
+
+.chat-container {
+    height: 100vh;
+    padding: 15px;
+    overflow-y: auto;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-row:first-child {
+    margin-top: auto !important;
+}
+
+.chat-row {
+    display: flex;
+    margin-bottom: 10px;
+}
+
+.chat-row.user {
+    justify-content: flex-end;
+}
+
+.chat-row.user .bubble {
+    background-color: #fef01b;
+    border-radius: 15px 15px 0 15px;
+}
+
+.chat-row.assistant {
+    justify-content: flex-start;
+}
+
+.chat-row.assistant .bubble {
+    background-color: white;
+    border-radius: 15px 15px 15px 0;
+}
+
+.bubble {
+    max-width: 70%;
+    padding: 10px 14px;
+    font-size: 15px;
+    line-height: 1.4;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    word-break: break-word;
+}
+    </style>
+</head>
+<body>
+<div class="chat-container" id="chat">
+    {% for chat in chat_history %}
+        <div class="chat-row {{ chat.role }}">
+            <div class="bubble">
+                {{ chat.message }}
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+    const chat = document.getElementById("chat");
+    
+    window.onload = function() {
+        chat.scrollTop = chat.scrollHeight;
+    };
+
+    const socket = io(); 
+    socket.on("new_message", data => {
+        const row = document.createElement("div");
+        row.className = `chat-row ${data.role}`;
+
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+        bubble.innerText = data.message;
+
+        row.appendChild(bubble);
+        chat.appendChild(row);
+
+        chat.scrollTop = chat.scrollHeight;
+    });
+</script>
+</body>
+</html>"""
 
 def load_and_clean_history():
     """파일에서 대화를 불러오고 30일이 지난 데이터는 삭제"""
@@ -33,7 +130,7 @@ chat_history = load_and_clean_history()
 
 @app.route("/")
 def index():
-    return render_template("index.html", chat_history=chat_history)
+    return render_template_string(HTML_TEMPLATE, chat_history=chat_history)
 
 @app.route("/add", methods=["POST"])
 def add_message():

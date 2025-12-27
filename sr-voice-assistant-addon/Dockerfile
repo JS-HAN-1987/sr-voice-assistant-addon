@@ -20,10 +20,12 @@ COPY utils.py /
 COPY app.py /
 COPY requirements.txt /
 
-# Flask 정적 파일 및 템플릿 디렉토리 생성 후 복사
+# Flask 디렉토리 생성
 RUN mkdir -p /templates /static
-COPY templates/ /templates/
-COPY static/ /static/
+
+# 파일 개별 복사 (디렉토리 전체 복사 대신)
+COPY templates/index.html /templates/ 2>/dev/null || true
+COPY static/style.css /static/ 2>/dev/null || true
 
 # 의존성 설치
 RUN echo "[INFO] Python 패키지 설치 중..." && \
