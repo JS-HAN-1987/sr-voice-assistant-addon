@@ -1,3 +1,4 @@
+# utils.py
 import os
 import json
 import logging
@@ -13,7 +14,6 @@ def load_options():
         "language": "ko",
         "stt_wyoming_port": 10300,
         "tts_wyoming_port": 10400,
-        "chat_ui_port": 9822,
         "ha_ip": "homeassistant"
     }
 
@@ -24,11 +24,12 @@ def load_options():
         except Exception as e:
             _LOGGER.error(f"옵션 파일 로드 실패: {e}")
 
+    # 환경 변수 우선순위 (Supervisor 제공 토큰 등)
     token = os.environ.get('SR_VOICE_TOKEN') or options.get('api_token')
     return options, token
 
 def fire_ha_event(event_type, event_data):
-    """Home Assistant 이벤트 발생"""
+    # 이 로그가 찍히는지 확인하는 게 핵심입니다!
     print(f">>> [DEBUG] fire_ha_event 호출됨: {event_type}", flush=True)
     
     options, token = load_options()
@@ -36,6 +37,7 @@ def fire_ha_event(event_type, event_data):
         print(">>> [DEBUG] 에러: 토큰이 없습니다!", flush=True)
         return
 
+    # IP 주소가 제대로 오는지 확인
     ha_ip = options.get('ha_ip', 'homeassistant')
     url = f"http://{ha_ip}:8123/api/events/{event_type}"
     
@@ -44,22 +46,3 @@ def fire_ha_event(event_type, event_data):
         print(f">>> [DEBUG] HA 응답 코드: {r.status_code}", flush=True)
     except Exception as e:
         print(f">>> [DEBUG] 전송 중 예외 발생: {e}", flush=True)
-
-def send_to_chat_ui(role, message):
-    """Flask Chat UI로 직접 메시지 전송"""
-    print(f">>> [DEBUG] Chat UI 전송: role={role}, message={message}", flush=True)
-    
-    options, _ = load_options()
-    chat_port = options.get('chat_ui_port', 9822)
-    
-    url = f"http://localhost:{chat_port}/add"
-    data = {
-        "role": role,
-        "message": message
-    }
-    
-    try:
-        r = requests.post(url, json=data, timeout=1)
-        print(f">>> [DEBUG] Chat UI 응답: {r.status_code}", flush=True)
-    except Exception as e:
-        print(f">>> [DEBUG] Chat UI 전송 실패: {e}", flush=True)

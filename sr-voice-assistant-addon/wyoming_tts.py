@@ -10,7 +10,7 @@ from wyoming.server import AsyncEventHandler, AsyncServer
 from wyoming.tts import Synthesize
 from wyoming.audio import AudioChunk, AudioStart, AudioStop
 from wyoming.event import Event
-from utils import fire_ha_event, send_to_chat_ui, load_options
+from utils import fire_ha_event, load_options
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,6 +24,8 @@ class GoogleTtsEventHandler(AsyncEventHandler):
 
     async def handle_event(self, event: Event) -> bool:
         if Describe.is_type(event.type):
+            print(">>> [TYPE] Describe 요청 받음", flush=True)
+            # 서버 정보 응답
             await self.write_event(
                 Info(
                     tts=[
@@ -89,15 +91,14 @@ class GoogleTtsEventHandler(AsyncEventHandler):
             return True
 
         if Synthesize.is_type(event.type):
+            # 텍스트를 음성으로 변환
             synthesize = Synthesize.from_event(event)
             _LOGGER.info(f"TTS 요청 수신: {synthesize.text}")
 
-            # Chat UI로 직접 전송 (assistant role)
-            loop = asyncio.get_running_loop()
-            loop.run_in_executor(None, send_to_chat_ui, "assistant", synthesize.text)
-
-            # HA 이벤트 발생
+            # 2. 이벤트 발생 (루프를 방해하지 않게 백그라운드로 뺌)
             try:
+                loop = asyncio.get_running_loop()
+                # executor를 사용해야 requests.post가 음성 합성을 방해하지 않습니다.
                 loop.run_in_executor(None, fire_ha_event, "voice_tts", {"text": synthesize.text})
             except Exception as e:
                 _LOGGER.error(f"이벤트 발생 코드 에러: {e}")
@@ -109,7 +110,7 @@ class GoogleTtsEventHandler(AsyncEventHandler):
             else:
                 language = self.language
 
-            # gTTS 호환 언어로 정규화
+            # 🔥 gTTS 호환 언어로 정규화
             LANGUAGE_MAP = {
                 "ko-KR": "ko",
                 "ko": "ko",
@@ -118,18 +119,19 @@ class GoogleTtsEventHandler(AsyncEventHandler):
                 "ja-JP": "ja",
                 "ja": "ja",
             }
+
             language = LANGUAGE_MAP.get(language, self.language)
             
-            # 음성 합성 실행
+            # 비동기로 음성 합성 실행
             audio_data = await self._synthesize_speech(synthesize.text, language)
             
             if audio_data:
                 # 오디오 시작 이벤트
                 await self.write_event(
                     AudioStart(
-                        rate=22050,
-                        width=2,
-                        channels=1
+                        rate=22050,  # gTTS는 22050Hz 사용
+                        width=2,     # 16-bit
+                        channels=1   # mono
                     ).event()
                 )
                 
@@ -154,6 +156,10 @@ class GoogleTtsEventHandler(AsyncEventHandler):
                 _LOGGER.error("음성 합성 실패")
             
             return True
+        # 위 조건들에 해당하지 않는 나머지 이벤트들
+        else:
+            print(f">>> [TYPE] 알 수 없는 이벤트: {event.type}", flush=True)
+            # 여기서 event.data 등을 찍어보면 더 자세한 정보를 알 수 있습니다.
 
         return True
 
@@ -162,6 +168,7 @@ class GoogleTtsEventHandler(AsyncEventHandler):
         loop = asyncio.get_event_loop()
         
         try:
+            # gTTS로 음성 생성 (비동기 실행)
             audio_bytes = await loop.run_in_executor(
                 None,
                 partial(self._create_audio, text, language)
@@ -174,12 +181,15 @@ class GoogleTtsEventHandler(AsyncEventHandler):
     def _create_audio(self, text: str, language: str) -> bytes:
         """실제 음성 생성 함수 (동기)"""
         try:
+            # gTTS로 MP3 생성
             tts = gTTS(text=text, lang=language, slow=False)
             mp3_buffer = io.BytesIO()
             tts.write_to_fp(mp3_buffer)
             mp3_buffer.seek(0)
             
+            # MP3 raw bytes 반환
             audio_data = mp3_buffer.read()
+            
             return audio_data
         except Exception as e:
             _LOGGER.error(f"오디오 생성 오류: {e}")
@@ -193,6 +203,7 @@ async def main():
         format='[%(levelname)s] %(message)s'
     )
     
+    # 설정
     host = "0.0.0.0"
     port = 10400
     language = "ko"
@@ -204,6 +215,7 @@ async def main():
         _LOGGER.info(f"언어: {language}")
         _LOGGER.info("=" * 50)
         
+        # 서버 시작
         server = AsyncServer.from_uri(f"tcp://{host}:{port}")
         
         _LOGGER.info("서버 리스닝 중...")
@@ -218,6 +230,11 @@ async def main():
 
 
 if __name__ == "__main__":
+#    logging.basicConfig(
+#        level=logging.DEBUG, # INFO에서 DEBUG로 변경
+#        format='[%(levelname)s] %(message)s'
+#    )
+
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
