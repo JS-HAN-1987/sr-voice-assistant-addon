@@ -17,13 +17,19 @@ COPY run.sh /
 COPY wyoming_stt.py /
 COPY wyoming_tts.py /
 COPY utils.py /
+COPY app.py /
 COPY requirements.txt /
 
-# 의존성 설치 (디버깅 정보 포함)
+# Flask 정적 파일 및 템플릿 디렉토리 생성 후 복사
+RUN mkdir -p /templates /static
+COPY templates/ /templates/
+COPY static/ /static/
+
+# 의존성 설치
 RUN echo "[INFO] Python 패키지 설치 중..." && \
     pip3 install --no-cache-dir --break-system-packages -r /requirements.txt && \
     echo "[INFO] 설치된 패키지:" && \
-    pip3 list | grep -E "(SpeechRecognition|gTTS|wyoming|requests)"
+    pip3 list | grep -E "(SpeechRecognition|gTTS|wyoming|requests|Flask|socketio)"
 
 # 실행 권한 부여
 RUN chmod a+x /run.sh

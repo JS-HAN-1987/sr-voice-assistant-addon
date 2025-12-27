@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>음성 대화 기록</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="chat-container" id="chat">
+    {% for chat in chat_history %}
+        <div class="chat-row {{ chat.role }}">
+            <div class="bubble">
+                {{ chat.message }}
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+    const chat = document.getElementById("chat");
+    
+    // 페이지 로드 시 맨 아래로 스크롤
+    window.onload = function() {
+        chat.scrollTop = chat.scrollHeight;
+    };
+
+    // 실시간 메시지 수신
+    const socket = io(); 
+    socket.on("new_message", data => {
+        const row = document.createElement("div");
+        row.className = `chat-row ${data.role}`;
+
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+        bubble.innerText = data.message;
+
+        row.appendChild(bubble);
+        chat.appendChild(row);
+
+        // 새 메시지가 오면 하단으로 스크롤
+        chat.scrollTop = chat.scrollHeight;
+    });
+</script>
+</body>
+</html>

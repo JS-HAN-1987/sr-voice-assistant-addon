@@ -1,7 +1,7 @@
-name: "SR Voice Assistant"
-description: "Google STT, TTS 서버 (Wyoming Protocol)"
-version: "2.0.1"
-slug: "sr_voice_assistant"
+name: "SR Voice Assistant + Chat UI"
+description: "Google STT, TTS 서버 (Wyoming Protocol) + 대화 기록 웹 UI"
+version: "3.0.0"
+slug: "sr_voice_assistant_chat"
 init: false
 arch:
   - aarch64
@@ -11,14 +11,19 @@ arch:
 ports:
   10300/tcp: 10300
   10400/tcp: 10400
+  9822/tcp: 9822
 ports_description:
   10300/tcp: "Wyoming STT 포트"
   10400/tcp: "Wyoming TTS 포트"
+  9822/tcp: "Chat UI 웹 인터페이스"
+webui: "http://[HOST]:9822"
 options:
   language: "ko"
   ha_ip: "homeassistant"
   api_token: ""
+  chat_ui_port: 9822
 schema:
   language: str
   ha_ip: str
   api_token: str
+  chat_ui_port: int
