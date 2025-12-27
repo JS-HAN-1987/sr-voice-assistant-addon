@@ -1,7 +1,7 @@
-name: "SR Voice Assistant + Chat UI"
+name: "SR Voice Assistant"
 description: "Google STT, TTS 서버 (Wyoming Protocol) + 대화 기록 웹 UI"
 version: "3.0.1"
-slug: "sr_voice_assistant_chat"
+slug: "sr_voice_assistant"
 init: false
 arch:
   - aarch64
