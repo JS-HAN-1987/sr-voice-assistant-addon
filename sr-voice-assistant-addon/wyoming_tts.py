@@ -10,7 +10,6 @@ from wyoming.server import AsyncEventHandler, AsyncServer
 from wyoming.tts import Synthesize
 from wyoming.audio import AudioChunk, AudioStart, AudioStop
 from wyoming.event import Event
-from utils import send_to_chat_ui, load_options
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -99,9 +98,6 @@ class GoogleTtsEventHandler(AsyncEventHandler):
             synthesize = Synthesize.from_event(event)
             _LOGGER.info(f"TTS 요청 수신: {synthesize.text}")
 
-            # Chat UI로 직접 전송 (assistant role)
-            loop = asyncio.get_running_loop()
-            loop.run_in_executor(None, send_to_chat_ui, "assistant", synthesize.text)
             
             # 언어 설정
             voice = synthesize.voice

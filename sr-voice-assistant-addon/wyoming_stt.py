@@ -9,7 +9,6 @@ from wyoming.event import Event
 from wyoming.info import Describe, Info, Attribution, AsrProgram, AsrModel
 from wyoming.server import AsyncEventHandler, AsyncServer
 from wyoming.asr import Transcribe, Transcript
-from utils import send_to_chat_ui, load_options
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -79,11 +78,7 @@ class GoogleSttEventHandler(AsyncEventHandler):
             
             # 음성 인식 실행
             text = await self._recognize_speech()
-            if text:
-                # Chat UI로 직접 전송 (user role)
-                loop = asyncio.get_running_loop()
-                loop.run_in_executor(None, send_to_chat_ui, "user", text)
-
+            
             # 결과 전송
             await self.write_event(
                 Transcript(text=text).event()

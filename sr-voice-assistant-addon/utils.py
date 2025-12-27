@@ -47,22 +47,3 @@ def fire_ha_event(event_type, event_data):
         print(f">>> [DEBUG] HA 응답 코드: {r.status_code}", flush=True)
     except Exception as e:
         print(f">>> [DEBUG] 전송 중 예외 발생: {e}", flush=True)
-
-def send_to_chat_ui(role, message):
-    """Flask Chat UI로 직접 메시지 전송"""
-    print(f">>> [DEBUG] Chat UI 전송: role={role}, message={message}", flush=True)
-    
-    options, _ = load_options()
-    chat_port = options.get('chat_ui_port', 9822)
-    
-    url = f"http://localhost:{chat_port}/add"
-    data = {
-        "role": role,
-        "message": message
-    }
-    
-    try:
-        r = requests.post(url, json=data, timeout=1)
-        print(f">>> [DEBUG] Chat UI 응답: {r.status_code}", flush=True)
-    except Exception as e:
-        print(f">>> [DEBUG] Chat UI 전송 실패: {e}", flush=True)
