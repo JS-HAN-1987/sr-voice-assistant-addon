@@ -1,6 +1,6 @@
 name: "SR Voice Assistant"
 description: "Google STT, TTS 서버 (Wyoming Protocol)"
-version: "2.0.0"
+version: "2.0.1"
 slug: "sr_voice_assistant"
 init: false
 arch:
@@ -16,7 +16,7 @@ ports_description:
   10400/tcp: "Wyoming TTS 포트"
 options:
   language: "ko"
-  ha_ip: "http://homeassistant"
+  ha_ip: "homeassistant"
   api_token: ""
 schema:
   language: str
