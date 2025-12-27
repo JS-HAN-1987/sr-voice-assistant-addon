@@ -11,10 +11,10 @@ def load_options():
     options_file = "/data/options.json"
     options = {
         "api_port": 5007,
-        "language": "ko-KR",
+        "language": "ko",
         "stt_wyoming_port": 10300,
         "tts_wyoming_port": 10400,
-        "ha_ip": "192.168.219.111"
+        "ha_ip": "http://homeassistant"
     }
 
     if os.path.exists(options_file):
@@ -38,7 +38,7 @@ def fire_ha_event(event_type, event_data):
         return
 
     # IP 주소가 제대로 오는지 확인
-    ha_ip = options.get('ha_ip', '192.168.219.111')
+    ha_ip = options.get('ha_ip', 'http://homeassistant')
     url = f"http://{ha_ip}:8123/api/events/{event_type}"
     
     try:

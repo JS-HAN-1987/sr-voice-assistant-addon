@@ -40,7 +40,7 @@ class GoogleTtsEventHandler(AsyncEventHandler):
                             version="1.0",
                             voices=[
                                 TtsVoice(
-                                    name="ko-KR",
+                                    name="ko",
                                     description="Korean",
                                     attribution=Attribution(
                                         name="Google",
@@ -109,6 +109,18 @@ class GoogleTtsEventHandler(AsyncEventHandler):
                 language = voice.name
             else:
                 language = self.language
+
+            # 🔥 gTTS 호환 언어로 정규화
+            LANGUAGE_MAP = {
+                "ko-KR": "ko",
+                "ko": "ko",
+                "en-US": "en",
+                "en": "en",
+                "ja-JP": "ja",
+                "ja": "ja",
+            }
+
+            language = LANGUAGE_MAP.get(language, self.language)
             
             # 비동기로 음성 합성 실행
             audio_data = await self._synthesize_speech(synthesize.text, language)
