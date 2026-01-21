@@ -151,6 +151,8 @@ curl -X POST http://homeassistant.local:9822/add \
 
 ## 버전 히스토리
 
+- **3.1.1 (Fix)**:
+  - 🐛 `numpy` 의존성 추가 (ModuleNotFoundError 해결)
 - **3.1.0 (Feature)**:
   - ✨ Blossom 로봇 제어 기능 추가 (UDP, JSON Parsing)
   - ✨ Wake Word DOA 반응 (ESP32)
