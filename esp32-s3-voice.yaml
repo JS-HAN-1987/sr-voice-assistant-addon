@@ -796,28 +796,6 @@ micro_wake_word:
                             # --- Wake Word Robot Reaction ---
                             # Call async script (leaves voice assitant unblocked)
                             - script.execute: ear_wiggle_wake_action
-                            # Do not delay here!
-                                // User asked for "Face DOA".
-                                // Let's try to read the sensor state if it exists, or just enable UDP control and let pure logic handle it?
-                                // No, user wants it ON WAKE WORD.
-                                // Let's assume we can just move ears for now, and try to get DOA if possible.
-                                // Sensor 'doa' id is NOT defined in the yaml provided cleanly as a sensor component, 
-                                // it is under 'esp_sr_doa'.
-                                
-                                // Looking at provided config:
-                                // esp_sr_doa:
-                                //   id: esp_doa_node
-                                //   doa:
-                                //     name: "DOA Angle"
-                                
-                                // This creates a sensor. We can access `id(esp_doa_node).doa_sensor->state` ?
-                                // Or `id(esp_doa_node).get_doa()`?
-                                // Let's checking standard esphome component... usually it creates text_sensor or sensor.
-                                // But here it says `doa: name: ...`. It likely creates a sensor.
-                                // Since we don't know the exact ID of the sensor (it's auto generated from name?), 
-                                // Creating an explicit ID for the sensor in the config is safer.
-                                
-                                // For now, let's just do the EAR wiggle.
                                 // set_motors(0, 0, 0, 30); // Ears down/up?
                                 set_motors(0, 0, 0, -40); // Ears Down/Back
                                 
