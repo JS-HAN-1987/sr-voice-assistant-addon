@@ -69,10 +69,11 @@ esphome:
               - microphone.stop_capture: i2s_mics
               - microphone.stop_capture: i2s_mics
 
-    - priority: 200
+    - priority: -100  # Run after WiFi is connected
       then:
         - lambda: |-
              auto *udp_listener = new UDPListener();
+             udp_listener->setup();  // Explicitly start UDP server
              App.register_component(udp_listener);
              
     - priority: 375
