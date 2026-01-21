@@ -171,6 +171,9 @@ curl -X POST http://homeassistant.local:9822/add \
 
 ## 버전 히스토리
 
+- **3.1.2 (Fix)**:
+  - 🐛 Chat UI: 로봇 제어 JSON 명령어 숨김 처리
+  - 📝 ESP32 설치 가이드 추가 및 서보 로직 개선
 - **3.1.1 (Fix)**:
   - 🐛 `numpy` 의존성 추가 (ModuleNotFoundError 해결)
 - **3.1.0 (Feature)**:
