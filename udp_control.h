@@ -22,19 +22,22 @@ std::vector<std::string> split(const std::string &s, char delimiter) {
   return tokens;
 }
 
-// Fixed function: Use Servo::write directly
+// Fixed function: Use Servo::write with correct -1 to 1 range
 void set_servo_level(esphome::servo::Servo *servo, float angle) {
   if (servo == nullptr)
     return;
+  // Clamp angle to safe range (-50 to 50 degrees)
   if (angle > 50.0f)
     angle = 50.0f;
   if (angle < -50.0f)
     angle = -50.0f;
 
-  // Angle -50~50 -> Duty 0.025~0.125 (Center 0.075)
-  float level = 0.075f + (angle / 180.0f) * 0.10f;
+  // ESPHome servo->write() expects -1.0 to 1.0
+  // Where: -1.0 = min_level, 0.0 = idle_level, 1.0 = max_level
+  // Assuming ±90 degrees maps to ±1.0
+  float level = angle / 90.0f;
 
-  // Use write() directly for Servo
+  ESP_LOGD("servo_ctrl", "Angle: %.1f -> Level: %.3f", angle, level);
   servo->write(level);
 }
 
