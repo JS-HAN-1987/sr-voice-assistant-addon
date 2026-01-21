@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import io
+import os
 from gtts import gTTS
 from functools import partial
 from wyoming.info import Describe, Info, Attribution, TtsProgram, TtsVoice
@@ -43,8 +44,9 @@ class RotationTransformer:
         return abc_rotations[0], abc_rotations[1], abc_rotations[2]
 
 class BlossomController:
-    def __init__(self, host="esp32-voice.local", port=5005):
-        self.host = host
+    def __init__(self, port=5005):
+        self.host = os.getenv("ESP_IP", "esp32-voice.local")
+        _LOGGER.info(f"Initialized BlossomController with host: {self.host}:{port}")
         self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.transformer = RotationTransformer()
