@@ -19,8 +19,6 @@ ports_description:
 options:
   language: "ko"
   chat_ui_port: 9822
-  esp_ip: "esp32-voice.local"
 schema:
   language: str
   chat_ui_port: int
-  esp_ip: str

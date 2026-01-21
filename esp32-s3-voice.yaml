@@ -52,8 +52,6 @@ esphome:
   name: $device_name
   friendly_name: esp32_voice
   min_version: 2025.8.0
-  includes:
-    - udp_control.h
   on_boot:
     - priority: -100
       then:
@@ -232,7 +230,17 @@ api:
       then:
         - lambda: |-
             ESP_LOGI("api_motor", "set_motors: %.1f, %.1f, %.1f, %.1f", m1, m2, m3, m4);
-            set_motors(m1, m2, m3, m4);
+            // Inline servo control: angle / 90.0 maps to -1..1 range
+            // Clamp to safe range (-50 to 50 degrees)
+            auto set_servo = [](esphome::servo::Servo *s, float angle) {
+              if (angle > 50.0f) angle = 50.0f;
+              if (angle < -50.0f) angle = -50.0f;
+              s->write(angle / 90.0f);
+            };
+            set_servo(&id(my_servo_1), m1);
+            set_servo(&id(my_servo_2), m2);
+            set_servo(&id(my_servo_3), m3);
+            set_servo(&id(my_servo_4), m4);
   on_client_connected:
     - script.execute: control_leds
   on_client_disconnected:
@@ -1032,14 +1040,14 @@ script:
           format: "EAR WIGGLE: Starting"
           level: INFO
       - lambda: |-
-          // Move ear (servo 4) down (-40 deg)
-          ESP_LOGI("ear_wiggle", "Setting motors: 0, 0, 0, -40");
-          set_motors(0, 0, 0, -40);
-      - delay: 1.2s # Wait for 1s transition + buffer
+          // Move ear (servo 4) down (-40 deg -> level -0.44)
+          ESP_LOGI("ear_wiggle", "Ear down");
+          id(my_servo_4).write(-40.0f / 90.0f);
+      - delay: 1.2s
       - lambda: |-
           // Move ear back to neutral (0 deg)
-          ESP_LOGI("ear_wiggle", "Setting motors: 0, 0, 0, 0");
-          set_motors(0, 0, 0, 0);
+          ESP_LOGI("ear_wiggle", "Ear neutral");
+          id(my_servo_4).write(0.0f);
 
   - id: disable_repeat
     then:
