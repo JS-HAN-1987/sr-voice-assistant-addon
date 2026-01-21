@@ -1,6 +1,6 @@
 name: "SR Voice Assistant"
 description: "Google STT, TTS 서버 (Wyoming Protocol) + 대화 기록 웹 UI"
-version: "3.2.3"
+version: "3.2.4"
 slug: "sr_voice_assistant"
 init: false
 homeassistant_api: true
