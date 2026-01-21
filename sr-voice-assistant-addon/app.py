@@ -143,6 +143,21 @@ def add_message():
         "timestamp": datetime.now().isoformat()
     }
     
+    # --- Robot Control JSON Filter ---
+    try:
+        if new_msg["role"] == "assistant":
+            # Remove [ ... ] JSON block if present
+            import re
+            json_pattern = r'(\[.*?\])'
+            new_msg["message"] = re.sub(json_pattern, '', new_msg["message"], flags=re.DOTALL).strip()
+            # Also clean up potential markdown block artifacts around it
+            new_msg["message"] = re.sub(r'^```json\s*', '', new_msg["message"])
+            new_msg["message"] = re.sub(r'^```\s*', '', new_msg["message"])
+            new_msg["message"] = re.sub(r'```\s*$', '', new_msg["message"]).strip()
+    except:
+        pass
+    # ---------------------------------
+    
     chat_history.append(new_msg)
     
     # 30일 지난 데이터 정리
