@@ -299,13 +299,9 @@ class GoogleTtsEventHandler(AsyncEventHandler):
                 # 오디오 종료 이벤트
                 await self.write_event(AudioStop().event())
                 
-                # Stop Robot if still running
-                if robot_action_task:
-                     robot_controller.stop()
-                     try:
-                         await robot_action_task
-                     except:
-                         pass
+                # Robot sequence runs independently - don't stop it when TTS ends
+                # It will complete on its own based on its delay timings
+                # robot_controller.stop() removed - let sequence complete
 
                 _LOGGER.info(f"음성 합성 완료: {len(audio_data)} bytes")
             else:
