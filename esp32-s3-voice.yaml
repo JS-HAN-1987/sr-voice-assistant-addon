@@ -237,10 +237,10 @@ api:
               if (angle < -50.0f) angle = -50.0f;
               s->write(angle / 90.0f);
             };
-            set_servo(&id(my_servo_1), m1);
-            set_servo(&id(my_servo_2), m2);
-            set_servo(&id(my_servo_3), m3);
-            set_servo(&id(my_servo_4), m4);
+            set_servo(id(my_servo_1), m1);
+            set_servo(id(my_servo_2), m2);
+            set_servo(id(my_servo_3), m3);
+            set_servo(id(my_servo_4), m4);
   on_client_connected:
     - script.execute: control_leds
   on_client_disconnected:
@@ -1040,9 +1040,9 @@ script:
           format: "EAR WIGGLE: Starting"
           level: INFO
       - lambda: |-
-          // Move ear (servo 4) down (-40 deg -> level -0.44)
+          // Move ear (servo 4) down (-80 deg)
           ESP_LOGI("ear_wiggle", "Ear down");
-          id(my_servo_4).write(-40.0f / 90.0f);
+          id(my_servo_4).write(-80.0f / 90.0f);
       - delay: 1.2s
       - lambda: |-
           // Move ear back to neutral (0 deg)

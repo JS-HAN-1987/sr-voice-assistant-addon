@@ -11,7 +11,7 @@ from wyoming.server import AsyncEventHandler, AsyncServer
 from wyoming.tts import Synthesize
 from wyoming.audio import AudioChunk, AudioStart, AudioStop
 from wyoming.event import Event
-_LOGGER = logging.getLogger(__name__)\n
+_LOGGER = logging.getLogger(__name__)
 import math
 import re
 import json
