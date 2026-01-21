@@ -11,10 +11,7 @@ from wyoming.server import AsyncEventHandler, AsyncServer
 from wyoming.tts import Synthesize
 from wyoming.audio import AudioChunk, AudioStart, AudioStop
 from wyoming.event import Event
-
-_LOGGER = logging.getLogger(__name__)
-
-import socket
+_LOGGER = logging.getLogger(__name__)\n
 import math
 import re
 import json
@@ -44,28 +41,38 @@ class RotationTransformer:
         return abc_rotations[0], abc_rotations[1], abc_rotations[2]
 
 class BlossomController:
-    def __init__(self, port=5005):
-        self.host = os.getenv("ESP_IP", "esp32-voice.local")
-        _LOGGER.info(f"Initialized BlossomController with host: {self.host}:{port}")
-        self.port = port
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    """Robot controller using Home Assistant ESPHome API"""
+    
+    def __init__(self):
+        self.ha_url = os.getenv("SUPERVISOR_API", "http://supervisor/core")
+        self.ha_token = os.getenv("SUPERVISOR_TOKEN", "")
         self.transformer = RotationTransformer()
         self._stop_event = asyncio.Event()
+        _LOGGER.info(f"Initialized BlossomController (HA API Mode)")
 
-    def send_cmd(self, m1, m2, m3, m4):
-        """Send raw motor angles via UDP"""
-        msg = f"{m1:.2f},{m2:.2f},{m3:.2f},{m4:.2f}"
+    async def send_cmd(self, m1, m2, m3, m4):
+        """Send motor angles via Home Assistant ESPHome service"""
+        import aiohttp
+        
+        service_url = f"{self.ha_url}/api/services/esphome/esp32_voice_set_motors"
+        headers = {
+            "Authorization": f"Bearer {self.ha_token}",
+            "Content-Type": "application/json"
+        }
+        data = {"m1": m1, "m2": m2, "m3": m3, "m4": m4}
+        
         try:
-            self.sock.sendto(msg.encode(), (self.host, self.port))
-            # _LOGGER.debug(f"Sent UDP: {msg}")
+            async with aiohttp.ClientSession() as session:
+                async with session.post(service_url, json=data, headers=headers) as resp:
+                    if resp.status != 200:
+                        _LOGGER.error(f"HA API Error: {resp.status}")
+                    else:
+                        _LOGGER.debug(f"Sent motors: {m1:.1f}, {m2:.1f}, {m3:.1f}, {m4:.1f}")
         except Exception as e:
-            _LOGGER.error(f"UDP Send Error: {e}")
+            _LOGGER.error(f"HA API Send Error: {e}")
 
     async def run_sequence(self, actions):
-        """
-        Execute a sequence of actions.
-        actions: list of dicts [{'r':.., 'p':.., ..}, ...]
-        """
+        """Execute a sequence of actions."""
         self._stop_event.clear()
         _LOGGER.info(f"Starting Robot Sequence: {len(actions)} steps")
         
@@ -77,32 +84,26 @@ class BlossomController:
                 r = float(action.get('r', 0))
                 p = float(action.get('p', 0))
                 y = float(action.get('y', 0))
-                ear = float(action.get('a', 0)) # Ear angle
+                ear = float(action.get('a', 0))
                 delay = float(action.get('d', 0.5))
 
-                # Calculate Motor Angles
+                # Calculate Motor Angles (IK)
                 m1, m2, m3 = self.transformer.rpy_to_abc_rotation(r, p, y)
                 
-                # Send Command
-                self.send_cmd(m1, m2, m3, ear)
+                # Send Command via HA API
+                await self.send_cmd(m1, m2, m3, ear)
                 
-                # Delay (Async)
+                # Delay (Async, interruptible)
                 try:
                     await asyncio.wait_for(self._stop_event.wait(), timeout=delay)
-                    # If wait returns without timeout, it means stop_event was set
-                    break
+                    break  # stop_event was set
                 except asyncio.TimeoutError:
-                    # Timeout reached, continue to next step
-                    pass
+                    pass  # Timeout reached, continue
                     
         except Exception as e:
             _LOGGER.error(f"Sequence Error: {e}")
         finally:
             _LOGGER.info("Robot Sequence Ended")
-            # Optional: Return to neutral? User said "stop immediately", sticking to last position might be cleaner or neutral.
-            # But the prompt says "동작은 멈춰야 해. 동작이 남아 있더라도."
-            # It implies stopping the *sequence*, not necessarily resetting.
-            pass
 
     def stop(self):
         self._stop_event.set()

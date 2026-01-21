@@ -171,6 +171,11 @@ curl -X POST http://homeassistant.local:9822/add \
 
 ## 버전 히스토리
 
+- **3.2.0 (Refactor)**:
+  - 🔄 UDP → ESPHome API 방식으로 전환 (안정성 대폭 향상)
+  - ✅ Home Assistant 서비스 호출로 모터 제어
+  - 🗑️ UDP 서버 코드 완전 제거
+  - ➕ `aiohttp` 의존성 추가
 - **3.1.3 (Feature)**:
   - ✨ `esp_ip` 옵션 추가: ESP32 IP 직접 지정 가능 (mDNS 불안정 해결)
 - **3.1.2 (Fix)**:

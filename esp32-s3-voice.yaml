@@ -71,10 +71,9 @@ esphome:
 
     - priority: -100  # Run after WiFi is connected
       then:
-        - lambda: |-
-             auto *udp_listener = new UDPListener();
-             udp_listener->setup();  // Explicitly start UDP server
-             App.register_component(udp_listener);
+        - logger.log:
+            format: "Blossom Robot Controller Initialized (API Mode)"
+            level: INFO
              
     - priority: 375
       then:
@@ -223,6 +222,17 @@ api:
             tzset();
             id(saved_time_zone) = posix_time_zone;
             id(publish_current_time).execute();
+    # Robot Motor Control API Action (called from Add-on via HA)
+    - action: set_motors
+      variables:
+        m1: float
+        m2: float
+        m3: float
+        m4: float
+      then:
+        - lambda: |-
+            ESP_LOGI("api_motor", "set_motors: %.1f, %.1f, %.1f, %.1f", m1, m2, m3, m4);
+            set_motors(m1, m2, m3, m4);
   on_client_connected:
     - script.execute: control_leds
   on_client_disconnected:
