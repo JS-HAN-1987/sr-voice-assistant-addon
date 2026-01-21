@@ -9,7 +9,6 @@
 #include <sys/socket.h>
 #include <vector>
 
-
 static const char *TAG = "udp_control";
 const int UDP_PORT = 5005;
 
@@ -94,6 +93,8 @@ public:
     if (len > 0) {
       rx_buffer[len] = 0;
       std::string msg(rx_buffer);
+      ESP_LOGD(TAG, "Received UDP: %s", msg.c_str()); // Debug Log
+
       std::vector<std::string> parts;
       std::string token;
       std::istringstream tokenStream(msg);
@@ -106,7 +107,10 @@ public:
         float m2 = strtof(parts[1].c_str(), &end);
         float m3 = strtof(parts[2].c_str(), &end);
         float m4 = strtof(parts[3].c_str(), &end);
+        ESP_LOGI(TAG, "Moving Motors: %.2f, %.2f, %.2f, %.2f", m1, m2, m3, m4);
         set_motors(m1, m2, m3, m4);
+      } else {
+        ESP_LOGW(TAG, "Invalid UDP format: %s", msg.c_str());
       }
     }
   }
