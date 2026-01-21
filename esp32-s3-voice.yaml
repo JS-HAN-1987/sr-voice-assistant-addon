@@ -796,12 +796,6 @@ micro_wake_word:
                             # --- Wake Word Robot Reaction ---
                             # Call async script (leaves voice assitant unblocked)
                             - script.execute: ear_wiggle_wake_action
-                                // set_motors(0, 0, 0, 30); // Ears down/up?
-                                set_motors(0, 0, 0, -40); // Ears Down/Back
-                                
-                            - delay: 0.3s
-                            - lambda: |-
-                                set_motors(0, 0, 0, 0);   // Ears Up/Neutral
 
 globals:
   - id: mic_gain_saved
