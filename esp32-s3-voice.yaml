@@ -81,6 +81,7 @@ esphome:
             id: next_timer
             state: -1
         - script.execute: control_leds
+        - script.execute: ear_wiggle_wake_action
         - delay: 10min
         - if:
             condition:
@@ -274,7 +275,7 @@ servo:
     max_level: 12.5%
   - id: my_servo_4
     output: servo_pwm_4
-    transition_length: 0.1s
+    transition_length: 1s
     min_level: 2.5%
     idle_level: 7.5%
     max_level: 12.5%
@@ -793,20 +794,9 @@ micro_wake_word:
                                 wake_word: !lambda return wake_word;
 
                             # --- Wake Word Robot Reaction ---
-                            - lambda: |-
-                                // Get DOA Reading (0-360) and convert to Relative Yaw
-                                // Assuming 0 is front. If DOA is 0-360:
-                                // We need to map it to -50 to 50.
-                                // NOTE: We don't have current robot orientation, assume static or reset?
-                                // Actually, we just want to look AT the sound.
-                                // If sound is at 90 (left), we turn positive/negative?
-                                // Let's just do a simple mapping for now.
-                                // Clamp to max range.
-                                
-                                // id(esp_doa_node).doa -> returns int angle usually? 
-                                // Wait, esp_sr_doa doesn't expose a simple state directly easily in lambda without looking at source
-                                // But usually it publishes a sensor.
-                                // Let's assume we can access it or we just do a "nod" first for safety if accessing DOA is complex.
+                            # Call async script (leaves voice assitant unblocked)
+                            - script.execute: ear_wiggle_wake_action
+                            # Do not delay here!
                                 // User asked for "Face DOA".
                                 // Let's try to read the sensor state if it exists, or just enable UDP control and let pure logic handle it?
                                 // No, user wants it ON WAKE WORD.
@@ -1050,6 +1040,17 @@ script:
               .set_announcement(true)
               .perform();
             id(external_media_player)->set_playlist_delay_ms(speaker::AudioPipelineType::ANNOUNCEMENT, 500);
+
+  - id: ear_wiggle_wake_action
+    mode: restart
+    then:
+      - lambda: |-
+          // Move ear (servo 4) down (-40 deg)
+          set_motors(0, 0, 0, -40);
+      - delay: 1.2s # Wait for 1s transition + buffer
+      - lambda: |-
+          // Move ear back to neutral (0 deg)
+          set_motors(0, 0, 0, 0);
 
   - id: disable_repeat
     then:
