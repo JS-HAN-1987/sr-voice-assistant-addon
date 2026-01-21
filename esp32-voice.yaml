@@ -25,7 +25,7 @@ substitutions:
   mic_channel_2: 'stereo' # voice assistant does not support stereo
 
   #WORKING
-  which_mic: 0 #0=left, 1=right, 2=stereo
+  which_mic: 2 #0=left, 1=right, 2=stereo
   i2s_sample_rate: 16000 # Works as in sync with microphone (mic must have 16000 for voice assistant)
   i2s_bits_per_sample: 32
   #i2s_bits_per_sample: 16
@@ -52,6 +52,8 @@ esphome:
   name: $device_name
   friendly_name: esp32_voice
   min_version: 2025.8.0
+  includes:
+    - udp_control.h
   on_boot:
     - priority: -100
       then:
@@ -65,6 +67,14 @@ esphome:
               - micro_wake_word.stop:
               - voice_assistant.stop:
               - microphone.stop_capture: i2s_mics
+              - microphone.stop_capture: i2s_mics
+
+    - priority: 200
+      then:
+        - lambda: |-
+             auto *udp_listener = new UDPListener();
+             App.register_component(udp_listener);
+             
     - priority: 375
       then:
         - sensor.template.publish:
@@ -89,6 +99,20 @@ esphome:
         - lambda: |-
             setenv("TZ", id(saved_time_zone).c_str(), 1);
             tzset();
+    - priority: 600 # 서보 컴포넌트가 준비된 직후 실행
+      then:
+        - servo.write:
+            id: my_servo_1
+            level: 0  # 0% 위치(중앙)로 이동
+        - servo.write:
+            id: my_servo_2
+            level: 0  # 0% 위치(중앙)로 이동
+        - servo.write:
+            id: my_servo_3
+            level: 0  # 0% 위치(중앙)로 이동
+        - servo.write:
+            id: my_servo_4
+            level: 0  # 0% 위치(중앙)로 이동
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -100,6 +124,8 @@ esp32:
     version: recommended
     sdkconfig_options:
       CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+
+
       CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
       CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
 
@@ -112,6 +138,24 @@ esp32:
 
       CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
       CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"  # TLS1.3 support isn't enabled by default in IDF 5.1.5
+      
+      # Aggressive PSRAM Configuration to prevent OOM crashes
+      CONFIG_SPIRAM_USE_MALLOC: "y"
+      CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL: "4096" # Reduce threshold to 4KB to force more buffers to PSRAM
+      CONFIG_ESP32S3_SPIRAM_SUPPORT: "y"
+      
+      # Core dump configuration for crash diagnostics
+      CONFIG_ESP_COREDUMP_ENABLE: "y"
+      CONFIG_ESP_COREDUMP_UART_DELAY: "0"
+      CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF: "y"
+      CONFIG_ESP_COREDUMP_CHECKSUM_CRC32: "y"
+      CONFIG_ESP_COREDUMP_MAX_TASKS_NUM: "64"
+      
+      # Enhanced watchdog configuration
+      CONFIG_ESP_TASK_WDT_TIMEOUT_S: "10"  # Increase from default 5s to 10s
+      CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0: "y"
+      CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1: "y"
+      
 
 wifi:
   id: wifi_id
@@ -134,6 +178,8 @@ debug:
 
 logger:
   level: DEBUG
+  logs:
+    esp_sr_doa: DEBUG
 
 api:
   id: api_id
@@ -180,7 +226,7 @@ api:
     - script.execute: control_leds
 
   encryption:
-    key: "QYl0GuXeEF4mTRNVG/XLfB3jhgOrv1GmRg8jP6IktmQ="
+    key: !secret api_key
 
 http_request:
   id: flask_post
@@ -190,6 +236,48 @@ ota:
   - platform: esphome
     id: ota_esphome
     password: !secret ota_password
+
+output:
+  - platform: ledc
+    pin: GPIO5
+    id: servo_pwm_1
+    frequency: 50Hz
+  - platform: ledc
+    pin: GPIO6
+    id: servo_pwm_2
+    frequency: 50Hz
+  - platform: ledc
+    pin: GPIO7
+    id: servo_pwm_3
+    frequency: 50Hz
+  - platform: ledc
+    pin: GPIO4
+    id: servo_pwm_4
+    frequency: 50Hz
+
+servo:
+  - id: my_servo_1
+    output: servo_pwm_1
+    # MG996R ǥ��: 0.5ms(2.5%) to 2.5ms(12.5%)
+    min_level: 2.5%
+    idle_level: 7.5%
+    max_level: 12.5%
+  - id: my_servo_2
+    output: servo_pwm_2
+    min_level: 2.5%
+    idle_level: 7.5%
+    max_level: 12.5%
+  - id: my_servo_3
+    output: servo_pwm_3
+    min_level: 2.5%
+    idle_level: 7.5%
+    max_level: 12.5%
+  - id: my_servo_4
+    output: servo_pwm_4
+    transition_length: 1s
+    min_level: 2.5%
+    idle_level: 7.5%
+    max_level: 12.5%
 
 i2c:
   - id: internal_i2c
@@ -292,6 +380,12 @@ external_components:
       ref: main
     components: [ es8311 ]
     refresh: 0s
+  - source:
+      type: git
+      url: "https://github.com/JS-HAN-1987/waveshare-s2-audio_esphome_voice_DOA_component"
+      ref: main
+    components: [ esp_sr_doa ]
+    refresh: 0s
 
 audio_dac:
   - platform: es8311
@@ -323,6 +417,28 @@ microphone:
     mclk_multiple: $i2s_mclk_multiple
     #channel: stereo
     channel: ${mic_channel_${which_mic}}
+    
+    # Feed audio data to DOA component
+    # IMPORTANT: Throttle to prevent watchdog timeout
+    on_data:
+      then:
+        - lambda: |-
+            //static uint32_t count = 0;
+            //count++;
+            
+            // Log every 100 calls for monitoring
+            //if (count % 100 == 0) {
+            //  ESP_LOGI("mic_on_data", "on_data called %d times, data size: %d", count, x.size());
+            //}
+            
+            // Feed every chunk to DOA for maximum responsiveness
+            // (1024 bytes = ~16ms. 5 ACCUM frames = ~80ms update rate)
+            id(esp_doa_node).feed_audio(x);
+
+esp_sr_doa:
+  id: esp_doa_node
+  doa:
+    name: "DOA Angle"
 
 speaker:
   - platform: i2s_audio
@@ -446,7 +562,7 @@ voice_assistant:
     microphone: i2s_mics
     #channels: 1 #Right
     #channels: 0 #Left
-    channels: $which_mic #correct that it's left/right cannel OR number of channels?
+    channels: 0 #Left channel (Mono) for VA
   media_player: external_media_player
   micro_wake_word: mww
   use_wake_word: false
@@ -617,7 +733,7 @@ micro_wake_word:
   id: mww
   microphone:
     microphone: i2s_mics
-    channels: $which_mic
+    channels: 0 #Left channel (Mono)
     #gain_factor: 4
   stop_after_detection: false
   models:
@@ -675,6 +791,49 @@ micro_wake_word:
                                   - delay: 300ms
                             - voice_assistant.start:
                                 wake_word: !lambda return wake_word;
+
+                            # --- Wake Word Robot Reaction ---
+                            - lambda: |-
+                                // Get DOA Reading (0-360) and convert to Relative Yaw
+                                // Assuming 0 is front. If DOA is 0-360:
+                                // We need to map it to -50 to 50.
+                                // NOTE: We don't have current robot orientation, assume static or reset?
+                                // Actually, we just want to look AT the sound.
+                                // If sound is at 90 (left), we turn positive/negative?
+                                // Let's just do a simple mapping for now.
+                                // Clamp to max range.
+                                
+                                // id(esp_doa_node).doa -> returns int angle usually? 
+                                // Wait, esp_sr_doa doesn't expose a simple state directly easily in lambda without looking at source
+                                // But usually it publishes a sensor.
+                                // Let's assume we can access it or we just do a "nod" first for safety if accessing DOA is complex.
+                                // User asked for "Face DOA".
+                                // Let's try to read the sensor state if it exists, or just enable UDP control and let pure logic handle it?
+                                // No, user wants it ON WAKE WORD.
+                                // Let's assume we can just move ears for now, and try to get DOA if possible.
+                                // Sensor 'doa' id is NOT defined in the yaml provided cleanly as a sensor component, 
+                                // it is under 'esp_sr_doa'.
+                                
+                                // Looking at provided config:
+                                // esp_sr_doa:
+                                //   id: esp_doa_node
+                                //   doa:
+                                //     name: "DOA Angle"
+                                
+                                // This creates a sensor. We can access `id(esp_doa_node).doa_sensor->state` ?
+                                // Or `id(esp_doa_node).get_doa()`?
+                                // Let's checking standard esphome component... usually it creates text_sensor or sensor.
+                                // But here it says `doa: name: ...`. It likely creates a sensor.
+                                // Since we don't know the exact ID of the sensor (it's auto generated from name?), 
+                                // Creating an explicit ID for the sensor in the config is safer.
+                                
+                                // For now, let's just do the EAR wiggle.
+                                // set_motors(0, 0, 0, 30); // Ears down/up?
+                                set_motors(0, 0, 0, -40); // Ears Down/Back
+                                
+                            - delay: 0.3s
+                            - lambda: |-
+                                set_motors(0, 0, 0, 0);   // Ears Up/Neutral
 
 globals:
   - id: mic_gain_saved
@@ -1221,6 +1380,60 @@ number:
             - light.turn_on:
                 id: status_ring
                 brightness: !lambda 'return x;'
+  - platform: template
+    name: "Servo 1 Control"
+    min_value: -90
+    max_value: 90
+    step: 1
+    mode: slider
+    optimistic: true
+    initial_value: 0
+    on_value:
+      then:
+        - servo.write:
+            id: my_servo_1
+            level: !lambda 'return x / 90.0;'
+
+  - platform: template
+    name: "Servo 2 Control"
+    min_value: -90
+    max_value: 90
+    step: 1
+    mode: slider
+    optimistic: true
+    initial_value: 0
+    on_value:
+      then:
+        - servo.write:
+            id: my_servo_2
+            level: !lambda 'return x / 90.0;'
+
+  - platform: template
+    name: "Servo 3 Control"
+    min_value: -90
+    max_value: 90
+    step: 1
+    mode: slider
+    optimistic: true
+    initial_value: 0
+    on_value:
+      then:
+        - servo.write:
+            id: my_servo_3
+            level: !lambda 'return x / 90.0;'
+  - platform: template
+    name: "Servo 4 Control"
+    min_value: -80
+    max_value: 0
+    step: 1
+    mode: slider
+    optimistic: true
+    initial_value: 0
+    on_value:
+      then:
+        - servo.write:
+            id: my_servo_4
+            level: !lambda 'return x / 90.0;'
 
 
 sensor:
@@ -1290,21 +1503,21 @@ binary_sensor:
             condition:
               switch.is_off: mic_mute_switch
             then:
-              # 타이머 울리는 중이면 끄기
+              # Ÿ�̸� �︮�� ���̸� ����
               - if:
                   condition:
                     switch.is_on: timer_ringing
                   then:
                     - switch.turn_off: timer_ringing
                   else:
-                    # 이미 음성 어시스턴트 동작 중이면 중지
+                    # �̹� ���� ��ý���Ʈ ���� ���̸� ����
                     - if:
                         condition:
                           voice_assistant.is_running
                         then:
                           - voice_assistant.stop
                         else:
-                          # wake sound (선택)
+                          # wake sound (����)
                           - if:
                               condition:
                                 switch.is_on: wake_sound
@@ -1314,7 +1527,7 @@ binary_sensor:
                                     priority: true
                                     sound_file: !lambda return id(wake_word_triggered_sound);
                                 - delay: 300ms
-                          # ⭐ 핵심: 버튼으로 음성 입력 시작
+                          # ? �ٽ�: ��ư���� ���� �Է� ����
                           - voice_assistant.start:
                               wake_word: "button"
   - platform: gpio

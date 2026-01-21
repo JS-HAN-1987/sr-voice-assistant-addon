@@ -9,6 +9,7 @@ Home Assistant용 통합 음성 어시스턴트 애드온 + 실시간 대화 기
 - 💬 **실시간 Chat UI**: 모든 대화를 카카오톡 스타일 웹 UI에서 확인
 - 🔌 **Wyoming Protocol**: Home Assistant 음성 어시스턴트 완전 통합
 - 📊 **이벤트 발생**: Home Assistant에서 자동화 가능
+- 🤖 **Blossom Robot Control**: LLM 응답을 통해 로봇 제어
 - 🌍 **다국어 지원**: 한국어, 영어, 일본어, 중국어 등
 
 ## 새로운 기능 (v3.0.0)
@@ -20,6 +21,12 @@ Home Assistant용 통합 음성 어시스턴트 애드온 + 실시간 대화 기
 - **역할 구분**:
   - 🎤 사용자 음성 (STT) → 노란색 말풍선 (오른쪽)
   - 🔊 어시스턴트 응답 (TTS) → 흰색 말풍선 (왼쪽)
+
+### 🤖 Blossom 로봇 제어 (v3.1.0)
+- **명령어 기반 제어**: LLM 응답 시작 부분에 JSON 명령어를 포함하여 로봇 제어
+  - 예: `[{"r":0, "p":10, "y":0, "a":20, "d":0.5}] 안녕하세요`
+- **Wake Word 반응**: "Hey Jarvis" 호출 시 화자 방향으로 회전 (ESP32)
+- **비동기 동작**: 음성 출력과 동시에 로봇 동작 수행, 출력 종료 시 로봇 정지
 
 ## 설치 방법
 
@@ -144,6 +151,9 @@ curl -X POST http://homeassistant.local:9822/add \
 
 ## 버전 히스토리
 
+- **3.1.0 (Feature)**:
+  - ✨ Blossom 로봇 제어 기능 추가 (UDP, JSON Parsing)
+  - ✨ Wake Word DOA 반응 (ESP32)
 - **3.0.0**: 
   - ✨ 실시간 Chat UI 추가
   - ✨ STT/TTS

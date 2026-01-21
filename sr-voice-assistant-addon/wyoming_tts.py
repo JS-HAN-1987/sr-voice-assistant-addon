@@ -13,6 +13,102 @@ from wyoming.event import Event
 
 _LOGGER = logging.getLogger(__name__)
 
+import socket
+import math
+import re
+import json
+import numpy as np
+
+# --- Blossom Robot Control Logic ---
+
+class RotationTransformer:
+    def __init__(self):
+        # a, b, c Axis Angles (Radians)
+        angles = np.radians([0, 120, 240])
+
+        # Basis Vectors (3x3 Matrix)
+        # Each row is x, y, z component of a, b, c vectors
+        # z component is 1.0 to ensure Yaw moves all motors
+        self.basis_vectors = np.array([
+            [np.cos(theta), np.sin(theta), 1.0] for theta in angles
+        ])
+
+    def rpy_to_abc_rotation(self, roll, pitch, yaw):
+        """Global RPY to Local ABC rotation (Degrees)"""
+        # Global Rotation Vector
+        global_rotation_vec = np.array([roll, pitch, yaw])
+
+        # Matrix Multiplication
+        abc_rotations = self.basis_vectors @ global_rotation_vec
+        return abc_rotations[0], abc_rotations[1], abc_rotations[2]
+
+class BlossomController:
+    def __init__(self, host="esp32-voice.local", port=5005):
+        self.host = host
+        self.port = port
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.transformer = RotationTransformer()
+        self._stop_event = asyncio.Event()
+
+    def send_cmd(self, m1, m2, m3, m4):
+        """Send raw motor angles via UDP"""
+        msg = f"{m1:.2f},{m2:.2f},{m3:.2f},{m4:.2f}"
+        try:
+            self.sock.sendto(msg.encode(), (self.host, self.port))
+            # _LOGGER.debug(f"Sent UDP: {msg}")
+        except Exception as e:
+            _LOGGER.error(f"UDP Send Error: {e}")
+
+    async def run_sequence(self, actions):
+        """
+        Execute a sequence of actions.
+        actions: list of dicts [{'r':.., 'p':.., ..}, ...]
+        """
+        self._stop_event.clear()
+        _LOGGER.info(f"Starting Robot Sequence: {len(actions)} steps")
+        
+        try:
+            for i, action in enumerate(actions):
+                if self._stop_event.is_set():
+                    break
+                
+                r = float(action.get('r', 0))
+                p = float(action.get('p', 0))
+                y = float(action.get('y', 0))
+                ear = float(action.get('a', 0)) # Ear angle
+                delay = float(action.get('d', 0.5))
+
+                # Calculate Motor Angles
+                m1, m2, m3 = self.transformer.rpy_to_abc_rotation(r, p, y)
+                
+                # Send Command
+                self.send_cmd(m1, m2, m3, ear)
+                
+                # Delay (Async)
+                try:
+                    await asyncio.wait_for(self._stop_event.wait(), timeout=delay)
+                    # If wait returns without timeout, it means stop_event was set
+                    break
+                except asyncio.TimeoutError:
+                    # Timeout reached, continue to next step
+                    pass
+                    
+        except Exception as e:
+            _LOGGER.error(f"Sequence Error: {e}")
+        finally:
+            _LOGGER.info("Robot Sequence Ended")
+            # Optional: Return to neutral? User said "stop immediately", sticking to last position might be cleaner or neutral.
+            # But the prompt says "동작은 멈춰야 해. 동작이 남아 있더라도."
+            # It implies stopping the *sequence*, not necessarily resetting.
+            pass
+
+    def stop(self):
+        self._stop_event.set()
+
+# Global Controller Instance
+robot_controller = BlossomController()
+
+
 
 class GoogleTtsEventHandler(AsyncEventHandler):
     """Wyoming event handler for Google TTS"""
@@ -96,7 +192,40 @@ class GoogleTtsEventHandler(AsyncEventHandler):
         if Synthesize.is_type(event.type):
 
             synthesize = Synthesize.from_event(event)
-            _LOGGER.info(f"TTS 요청 수신: {synthesize.text}")
+            text = synthesize.text
+            _LOGGER.info(f"TTS 요청 수신: {text}")
+
+            # --- Check for Robot Control JSON ---
+            # Format: [{"r":0,"p":10...}, ...] Text...
+            robot_action_task = None
+            
+            # Regex to find JSON array at start
+            # Matches [ ... ] possibly spanning lines, allowing nested braces if needed but simple is best
+            # Use non-greedy match for the content inside
+            match = re.match(r'^\s*(\[.*?\])(.*)', text, re.DOTALL)
+            
+            if match:
+                json_str = match.group(1)
+                text_content = match.group(2).strip()
+                
+                try:
+                    actions = json.loads(json_str)
+                    _LOGGER.info(f"Robot Actions Found: {len(actions)} steps")
+                    
+                    # Start Robot Task
+                    robot_action_task = asyncio.create_task(robot_controller.run_sequence(actions))
+                    
+                    # Update text to speak (remove JSON)
+                    text = text_content
+                    if not text:
+                        text = " " # Prevent empty text error
+                        
+                except json.JSONDecodeError:
+                    _LOGGER.warning("Failed to parse Robot JSON, treating as text")
+                except Exception as e:
+                    _LOGGER.error(f"Robot processing error: {e}")
+
+            # 언어 설정
 
             
             # 언어 설정
@@ -119,7 +248,7 @@ class GoogleTtsEventHandler(AsyncEventHandler):
             language = LANGUAGE_MAP.get(language, self.language)
             
             # 음성 합성 실행
-            audio_data = await self._synthesize_speech(synthesize.text, language)
+            audio_data = await self._synthesize_speech(text, language)
             
             if audio_data:
                 # 오디오 시작 이벤트
@@ -147,6 +276,14 @@ class GoogleTtsEventHandler(AsyncEventHandler):
                 # 오디오 종료 이벤트
                 await self.write_event(AudioStop().event())
                 
+                # Stop Robot if still running
+                if robot_action_task:
+                     robot_controller.stop()
+                     try:
+                         await robot_action_task
+                     except:
+                         pass
+
                 _LOGGER.info(f"음성 합성 완료: {len(audio_data)} bytes")
             else:
                 _LOGGER.error("음성 합성 실패")
