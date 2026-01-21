@@ -180,7 +180,8 @@ debug:
 logger:
   level: DEBUG
   logs:
-    esp_sr_doa: DEBUG
+    esp_sr_doa: WARN
+    sensor: WARN  # Suppress frequent sensor state updates
 
 api:
   id: api_id
@@ -1016,12 +1017,17 @@ script:
   - id: ear_wiggle_wake_action
     mode: restart
     then:
+      - logger.log:
+          format: "EAR WIGGLE: Starting"
+          level: INFO
       - lambda: |-
           // Move ear (servo 4) down (-40 deg)
+          ESP_LOGI("ear_wiggle", "Setting motors: 0, 0, 0, -40");
           set_motors(0, 0, 0, -40);
       - delay: 1.2s # Wait for 1s transition + buffer
       - lambda: |-
           // Move ear back to neutral (0 deg)
+          ESP_LOGI("ear_wiggle", "Setting motors: 0, 0, 0, 0");
           set_motors(0, 0, 0, 0);
 
   - id: disable_repeat
