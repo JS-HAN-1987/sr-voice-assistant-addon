@@ -196,32 +196,49 @@ class GoogleTtsEventHandler(AsyncEventHandler):
             _LOGGER.info(f"TTS 요청 수신: {text}")
 
             # --- Check for Robot Control JSON ---
-            # Format: [{"r":0,"p":10...}, ...] Text...
-            robot_action_task = None
+            # Robust Regex: Find [ ... ] block anywhere, accommodating Markdown ```json ... ``` wrapper
+            # Pattern: 
+            # 1. Optional ```json (or just ```)
+            # 2. [ ... ] (Non-greedy content)
+            # 3. Optional ```
             
-            # Regex to find JSON array at start
-            # Matches [ ... ] possibly spanning lines, allowing nested braces if needed but simple is best
-            # Use non-greedy match for the content inside
-            match = re.match(r'^\s*(\[.*?\])(.*)', text, re.DOTALL)
+            robot_action_task = None
+            json_pattern = r'(\[.*?\])'
+            
+            # Simple Search for array structure first
+            match = re.search(json_pattern, text, re.DOTALL)
             
             if match:
                 json_str = match.group(1)
-                text_content = match.group(2).strip()
                 
                 try:
+                    # Attempt parse
                     actions = json.loads(json_str)
                     _LOGGER.info(f"Robot Actions Found: {len(actions)} steps")
                     
                     # Start Robot Task
                     robot_action_task = asyncio.create_task(robot_controller.run_sequence(actions))
                     
-                    # Update text to speak (remove JSON)
-                    text = text_content
+                    # Remove the JSON part from text for TTS
+                    # Also clean up potential surrounding backticks if they exist
+                    start, end = match.span(1)
+                    
+                    # Check for preceding ``` or ```json
+                    pre_text = text[:start]
+                    post_text = text[end:]
+                    
+                    # Simple cleanup: Remove markdown code block markers if they were wrapping the JSON
+                    # If pre_text ends with ```json or ``` and post_text starts with ```
+                    pre_text = re.sub(r'```\w*\s*$', '', pre_text)
+                    post_text = re.sub(r'^\s*```', '', post_text)
+                    
+                    text = (pre_text + post_text).strip()
+                    
                     if not text:
                         text = " " # Prevent empty text error
                         
                 except json.JSONDecodeError:
-                    _LOGGER.warning("Failed to parse Robot JSON, treating as text")
+                    _LOGGER.warning(f"Found bracket block but failed to parse JSON: {json_str[:20]}...")
                 except Exception as e:
                     _LOGGER.error(f"Robot processing error: {e}")
 
