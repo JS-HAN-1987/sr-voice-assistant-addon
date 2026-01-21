@@ -59,15 +59,18 @@ class BlossomController:
             "Authorization": f"Bearer {self.ha_token}",
             "Content-Type": "application/json"
         }
-        data = {"m1": m1, "m2": m2, "m3": m3, "m4": m4}
+        data = {"m1": float(m1), "m2": float(m2), "m3": float(m3), "m4": float(m4)}
+        
+        _LOGGER.info(f"Calling HA API: {service_url}")
+        _LOGGER.info(f"Motor data: {data}")
         
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(service_url, json=data, headers=headers) as resp:
+                    resp_text = await resp.text()
+                    _LOGGER.info(f"HA API Response: {resp.status} - {resp_text[:200]}")
                     if resp.status != 200:
-                        _LOGGER.error(f"HA API Error: {resp.status}")
-                    else:
-                        _LOGGER.debug(f"Sent motors: {m1:.1f}, {m2:.1f}, {m3:.1f}, {m4:.1f}")
+                        _LOGGER.error(f"HA API Error: {resp.status} - {resp_text}")
         except Exception as e:
             _LOGGER.error(f"HA API Send Error: {e}")
 
