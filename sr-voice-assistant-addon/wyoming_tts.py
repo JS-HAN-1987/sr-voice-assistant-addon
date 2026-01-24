@@ -88,7 +88,7 @@ class BlossomController:
                 p = float(action.get('p', 0))
                 y = float(action.get('y', 0))
                 ear = float(action.get('a', 0))
-                delay = max(float(action.get('d', 1.0)), 0.1)  # Minimum 0.1s delay
+                delay = max(float(action.get('d', 1.0)), 0.5)  # Minimum 0.5s delay
                 
                 _LOGGER.info(f"Motion Step {i+1}: R={r}, P={p}, Y={y}, Ear={ear}, Delay={delay}")
 
