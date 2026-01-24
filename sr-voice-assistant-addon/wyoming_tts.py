@@ -88,7 +88,7 @@ class BlossomController:
                 p = float(action.get('p', 0))
                 y = float(action.get('y', 0))
                 ear = float(action.get('a', 0))
-                delay = max(float(action.get('d', 1.0)), 1.0)  # Minimum 1.0s delay
+                delay = max(float(action.get('d', 1.0)), 0.5)  # Minimum 0.5s delay
 
                 # Calculate Motor Angles (IK)
                 m1, m2, m3 = self.transformer.rpy_to_abc_rotation(r, p, y)
