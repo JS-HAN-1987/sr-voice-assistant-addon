@@ -1,6 +1,6 @@
 name: "SR Voice Assistant"
 description: "Google STT, TTS 서버 (Wyoming Protocol) + 대화 기록 웹 UI"
-version: "3.2.7"
+version: "3.2.8"
 slug: "sr_voice_assistant"
 init: false
 homeassistant_api: true
@@ -19,7 +19,5 @@ ports_description:
   9822/tcp: "Chat UI 웹 인터페이스"
 options:
   language: "ko"
-  chat_ui_port: 9822
 schema:
   language: str
-  chat_ui_port: int
